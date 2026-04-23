@@ -62,7 +62,6 @@ namespace NNUE {
         read(g_network.output_weights.data(), OUTPUT_BUCKETS * 2 * HIDDEN_SIZE * sizeof(int16_t));
         read(g_network.output_bias.data(), OUTPUT_BUCKETS * sizeof(int16_t));
 
-        std::cout << "NNUE: loaded embedded net v2 (" << size << " bytes)\n";
         return true;
 #else
         std::ifstream file(path, std::ios::binary);
