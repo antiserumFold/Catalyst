@@ -249,7 +249,7 @@ bool Search::is_shuffling(Move m, int ply) const {
         return false;
     if (ply >= 4 && (cur - 4)->move != MOVE_NONE)
         return (from_sq((cur - 2)->move) == to_sq((cur - 4)->move));
-    return true;
+    return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -707,7 +707,7 @@ int Search::negamax(Board &board,
             ++depth;
         // NEW: reduce depth if prior reduction was large and both evals sum high
         if (priorReduction >= 2 * LMR_FRAC && depth >= 2 && staticEval != SCORE_NONE
-            && (cur - 1)->staticEval != SCORE_NONE && staticEval + (cur - 1)->staticEval > 188)
+            && (cur - 1)->staticEval != SCORE_NONE && staticEval + (cur - 1)->staticEval > 173)
             --depth;
     }
 
@@ -744,7 +744,7 @@ int Search::negamax(Board &board,
         {
 
             int R = std::min(
-                NMP_BASE_R + depth / 3 + std::min(3, (staticEval - beta) / NMP_EVAL_DIV), depth);
+                NMP_BASE_R + depth / 3 + std::min(2, (staticEval - beta) / NMP_EVAL_DIV), depth);
 
             cur->move          = MOVE_NONE;
             cur->movedPt       = NO_PIECE_TYPE;
@@ -883,11 +883,12 @@ int Search::negamax(Board &board,
     if (!inCheck && depth <= HIST_PRUNE_DEPTH)
         mp.set_quiet_threshold(-HIST_PRUNE_MULT * depth);
 
-    Move bestMove   = MOVE_NONE;
-    int  bestScore  = -SCORE_INFINITE;
-    int  origAlpha  = alpha;
-    int  moveCount  = 0;
-    bool skipQuiets = false;
+    Move bestMove    = MOVE_NONE;
+    int  bestScore   = -SCORE_INFINITE;
+    int  origAlpha   = alpha;
+    int  moveCount   = 0;
+    bool skipQuiets  = false;
+    int  alphaRaises = 0;
 
     Move      quietsTried[64];
     int       quietCount = 0;
@@ -981,7 +982,7 @@ int Search::negamax(Board &board,
             && std::abs(ttScore) < SCORE_MATE_IN_MAX_PLY && !is_shuffling(m, ply))
         {
 
-            int singBeta = ttScore - (1 + (ttPV && !pvNode)) * depth;
+            int singBeta = ttScore - (53 + 75 * (ttPV && !pvNode)) * depth / 60;
             // Use ply+1 so the recursive call gets its own moveBuf slot
             int singScore
                 = negamax(board, depth / 2, singBeta - 1, singBeta, ply + 1, false, cutNode, m);
@@ -1094,6 +1095,9 @@ int Search::negamax(Board &board,
             if (isQuiet && histScore < -8192)
                 R_frac += LMR_FRAC;
 
+            if (alphaRaises > 0)
+                R_frac += alphaRaises * LMR_FRAC / 2;
+
             int nextCutoffs = (ply + 1 < MAX_PLY) ? ss(ply + 1)->cutoffCnt : 0;
             if (nextCutoffs > 2)
                 R_frac += 2 * LMR_FRAC;
@@ -1154,6 +1158,7 @@ int Search::negamax(Board &board,
         {
             bestMove = m;
             alpha    = score;
+            ++alphaRaises;
             if (pvNode
                 && (pvTable_[ply].length == 0
                     || pvTable_[ply + 1].length + 1 >= pvTable_[ply].length))

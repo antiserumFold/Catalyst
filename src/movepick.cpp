@@ -203,6 +203,8 @@ Move MovePicker::next_move() {
                     continue;
                 if (board.is_capture(m))
                     continue;
+                if (scores[cur - 1] < quietThreshold_)
+                    break;
                 return m;
             }
             stage      = STAGE_BAD_CAPTURES;
@@ -212,10 +214,9 @@ Move MovePicker::next_move() {
         case STAGE_BAD_CAPTURES:
             while (badCaptCur < captEnd)
             {
+                select_best(badCaptCur, captEnd);
                 Move m = moves[badCaptCur++];
                 if (m == ttMove)
-                    continue;
-                if (see_ge(m, seeThreshold))
                     continue;
                 return m;
             }
@@ -239,7 +240,9 @@ void MovePicker::generate_and_score_captures() {
     int goodCount = 0;
     for (int i = 0; i < captEnd; ++i)
     {
-        if (is_promotion(moves[i]) || see_ge(moves[i], 0))
+        int dynThresh
+            = is_promotion(moves[i]) ? -10000 : std::clamp(-scores[i] / 32 + 236, -500, 500);
+        if (is_promotion(moves[i]) || see_ge(moves[i], dynThresh))
         {
             if (i != goodCount)
             {
@@ -258,6 +261,53 @@ void MovePicker::generate_and_score_quiets() {
     quietEnd         = int(endPtr - moves);
 
     int phIdx = pawn_history_index(board.pawn_key());
+
+    static constexpr int THREAT_QUEEN_VAL = 8000;
+    static constexpr int THREAT_ROOK_VAL  = 5000;
+    static constexpr int THREAT_MINOR_VAL = 3000;
+
+    // ── PRECOMPUTE opponent threat map ONCE ──
+    Color    opp        = ~us;
+    Bitboard oppThreats = 0;
+
+    // Pawn attacks
+    Bitboard oppPawns = board.pieces(PAWN, opp);
+    while (oppPawns)
+    {
+        Square sq = pop_lsb(oppPawns);
+        oppThreats |= pawn_attacks(opp, sq);
+    }
+    // Knight attacks
+    Bitboard oppKnights = board.pieces(KNIGHT, opp);
+    while (oppKnights)
+    {
+        Square sq = pop_lsb(oppKnights);
+        oppThreats |= knight_attacks(sq);
+    }
+    // King attacks
+    oppThreats |= king_attacks(board.king_square(opp));
+
+    // Sliding pieces
+    Bitboard occ        = board.pieces();
+    Bitboard oppBishops = board.pieces(BISHOP, opp);
+    while (oppBishops)
+    {
+        Square sq = pop_lsb(oppBishops);
+        oppThreats |= bishop_attacks(sq, occ);
+    }
+    Bitboard oppRooks = board.pieces(ROOK, opp);
+    while (oppRooks)
+    {
+        Square sq = pop_lsb(oppRooks);
+        oppThreats |= rook_attacks(sq, occ);
+    }
+    Bitboard oppQueens = board.pieces(QUEEN, opp);
+    while (oppQueens)
+    {
+        Square sq = pop_lsb(oppQueens);
+        oppThreats |= bishop_attacks(sq, occ);
+        oppThreats |= rook_attacks(sq, occ);
+    }
 
     for (int i = captEnd; i < quietEnd; ++i)
     {
@@ -283,9 +333,36 @@ void MovePicker::generate_and_score_quiets() {
                 sc += (*contHist4)[pt][to] / 2;
         }
 
-        // Small bonus for moves that give check
         if (board.gives_check(m))
             sc += 8000;
+
+        // Threat escape bonus/malus — uses precomputed oppThreats
+        {
+            const Bitboard fromBB = square_bb(from_sq(m));
+            const Bitboard toBB   = square_bb(to_sq(m));
+
+            if (pt == QUEEN)
+            {
+                if (fromBB & oppThreats)
+                    sc += THREAT_QUEEN_VAL;
+                if (toBB & oppThreats)
+                    sc -= THREAT_QUEEN_VAL;
+            }
+            else if (pt == ROOK)
+            {
+                if (fromBB & oppThreats)
+                    sc += THREAT_ROOK_VAL;
+                if (toBB & oppThreats)
+                    sc -= THREAT_ROOK_VAL;
+            }
+            else if (pt == KNIGHT || pt == BISHOP)
+            {
+                if (fromBB & oppThreats)
+                    sc += THREAT_MINOR_VAL;
+                if (toBB & oppThreats)
+                    sc -= THREAT_MINOR_VAL;
+            }
+        }
 
         scores[i] = sc;
     }
