@@ -1,0 +1,51 @@
+name: Feature Request
+description: Suggest an idea or improvement for Catalyst
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea to improve Catalyst? Fill in the details below.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Catalyst does this relate to?
+      options:
+        - Search
+        - Evaluation / NNUE
+        - Time Management
+        - Move Generation
+        - UCI / Interface
+        - Datagen
+        - Build System
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Briefly describe the feature or improvement you'd like.
+      placeholder: A clear and concise description of what you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why would this be useful? What problem does it solve?
+      placeholder: Explain the use case or problem this addresses.
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional Context
+      description: Any references, prior art, or implementation ideas you have in mind.
+    validations:
+      required: false
