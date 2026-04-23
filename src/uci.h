@@ -29,55 +29,50 @@
 namespace Catalyst {
 
 struct UCIOptions {
-  int hashSizeMB = 64;
-  int moveOverhead = 50;
-  int threads = 1;
-  bool ponder = false;
+    int  hashSizeMB   = 64;
+    int  moveOverhead = 50;
+    int  threads      = 1;
+    bool ponder       = false;
 };
 
 class UCI {
 public:
-  UCI();
-  ~UCI();
-  void loop();
+    UCI();
+    ~UCI();
+    void loop();
 
 private:
-  Board board;
+    Board board;
 
-  // ThreadPool owns all Search objects (main + helpers).
-  // Heap-allocated because Search is ~4 MB per instance.
-  std::unique_ptr<ThreadPool> pool_;
+    std::unique_ptr<ThreadPool>  pool_;
+    std::unique_ptr<StateInfo[]> moveHistory;
+    TimeManager                  timeman;
+    UCIOptions                   options;
+    int                          moveHistoryCount = 0;
 
-  std::unique_ptr<StateInfo[]>
-      moveHistory; 
-  TimeManager timeman;
-  UCIOptions options;
-  int moveHistoryCount = 0;
+    std::thread searchThread_;
 
-  std::thread searchThread_;
+    Move      ponderMove_ = MOVE_NONE;
+    StateInfo ponderState_;
+    bool      isPondering_ = false;
+    Color     ponderStm_   = WHITE;
 
-  // ── Pondering state ───────────────────────────────────────────────────────
-  Move ponderMove_ = MOVE_NONE;
-  StateInfo ponderState_;
-  bool isPondering_ = false;
-  Color ponderStm_ = WHITE;
+    void join_search();
 
-  void join_search();
-
-  void cmd_uci();
-  void cmd_isready();
-  void cmd_ucinewgame();
-  void cmd_position(std::istringstream &iss);
-  void cmd_go(std::istringstream &iss);
-  void cmd_ponderhit();
-  void cmd_stop();
-  void cmd_setoption(std::istringstream &iss);
-  void cmd_bench(std::istringstream &iss); 
-  void cmd_eval();
-  void cmd_display();
-  void cmd_perft(std::istringstream &iss);
-  void apply_moves(std::istringstream &iss);
-  void cmd_datagen(std::istringstream &iss);
+    void cmd_uci();
+    void cmd_isready();
+    void cmd_ucinewgame();
+    void cmd_position(std::istringstream &iss);
+    void cmd_go(std::istringstream &iss);
+    void cmd_ponderhit();
+    void cmd_stop();
+    void cmd_setoption(std::istringstream &iss);
+    void cmd_bench(std::istringstream &iss);
+    void cmd_eval();
+    void cmd_display();
+    void cmd_perft(std::istringstream &iss);
+    void apply_moves(std::istringstream &iss);
+    void cmd_datagen(std::istringstream &iss);
 };
 
-} // namespace Catalyst
+}  // namespace Catalyst

@@ -150,7 +150,6 @@ void UCI::loop() {
 }
 
 void UCI::cmd_uci() {
-    // Hardware concurrency for max Threads cap
     int hwThreads = std::max(1, int(std::thread::hardware_concurrency()));
 
     std::cout << "id name " << ENGINE_NAME << " " << ENGINE_VERSION << "\n"
@@ -273,8 +272,6 @@ void UCI::cmd_go(std::istringstream &iss) {
     bool capturedApplied    = appliedPonder;
 
     searchThread_ = std::thread([this, capturedPonderMove, capturedApplied]() {
-        // pool_->search() launches helpers + runs main thread search.
-        // Returns when time is up / depth reached / stopped.
         Move best = pool_->search(board, timeman);
 
         if (best == MOVE_NONE)
@@ -289,7 +286,6 @@ void UCI::cmd_go(std::istringstream &iss) {
 
         isPondering_ = false;
 
-        // Validate ponder move from PV.
         Move ponder = pool_->ponder_move();
         if (ponder != MOVE_NONE)
         {
@@ -333,7 +329,7 @@ void UCI::cmd_stop() {
 void UCI::cmd_setoption(std::istringstream &iss) {
     std::string token, name, value;
 
-    iss >> token;  // "name"
+    iss >> token;
     while (iss >> token && token != "value")
         name += (name.empty() ? "" : " ") + token;
     while (iss >> token)
@@ -379,10 +375,8 @@ void UCI::cmd_setoption(std::istringstream &iss) {
 }
 
 void UCI::cmd_bench(std::istringstream &iss) {
-    int benchDepth = 13;  // Default depth
-    int threads    = 0;   // 0 = auto-detect
-
-    // Parse optional arguments
+    int         benchDepth = 13;
+    int         threads    = 0;
     std::string token;
     while (iss >> token)
     {
@@ -392,13 +386,8 @@ void UCI::cmd_bench(std::istringstream &iss) {
             continue;
     }
 
-    // Run benchmark
     auto result = Benchmark::run(benchDepth, threads);
-
-    // Print results
     Benchmark::print_results(result, true);
-
-    // Reset board to start position
     board.set_startpos();
 }
 
@@ -468,28 +457,29 @@ void UCI::apply_moves(std::istringstream &iss) {
 }
 
 void UCI::cmd_datagen(std::istringstream &iss) {
-    std::string output  = "catalyst_data.txt";
-    std::string book    = "";
-    int         threads = 4;
-    int         nodes   = 5000;
-    int         games   = 100000;
-
-    std::string token;
+    Datagen::DatagenConfig cfg;
+    std::string            token;
     while (iss >> token)
     {
         if (token == "output")
-            iss >> output;
+            iss >> cfg.output_path;
         else if (token == "threads")
-            iss >> threads;
-        else if (token == "nodes")
-            iss >> nodes;
+            iss >> cfg.threads;
         else if (token == "games")
-            iss >> games;
+            iss >> cfg.games;
+        else if (token == "softnodes")
+            iss >> cfg.soft_nodes;
+        else if (token == "hardnodes")
+            iss >> cfg.hard_nodes;
+        else if (token == "nodes")
+        {
+            iss >> cfg.soft_nodes;
+            cfg.hard_nodes = cfg.soft_nodes * 4;
+        }
         else if (token == "book")
-            iss >> book;
+            iss >> cfg.book_path;
     }
-
-    Datagen::run(output, threads, nodes, games, book);
+    Datagen::run(cfg);
 }
 
 }  // namespace Catalyst
