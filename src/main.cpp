@@ -25,34 +25,26 @@
 using namespace Catalyst;
 
 static void *uci_thread(void *) {
-  UCI uci;
-  uci.loop();
-  return nullptr;
+    UCI uci;
+    uci.loop();
+    return nullptr;
 }
 
 int main() {
-  init_bitboards();
-  Zobrist::init();
+    init_bitboards();
+    Zobrist::init();
+    NNUE::load("catalyst.nnue");
 
-  if (!NNUE::load("catalyst.nnue")) {
-    std::cerr
-        << "NNUE: WARNING — catalyst.bin not found or invalid.\n"
-        << "NNUE: Place catalyst.bin in the same directory as the engine.\n"
-        << "NNUE: Engine will still run but with degraded strength.\n";
+    std::cerr << ENGINE_NAME << " " << ENGINE_VERSION << " by " << ENGINE_AUTHOR << "\n";
     std::cerr.flush();
-  }
 
-  std::cerr << ENGINE_NAME << " " << ENGINE_VERSION << " by " << ENGINE_AUTHOR
-            << "\n";
-  std::cerr.flush();
+    pthread_t      thread;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, 256 * 1024 * 1024);
+    pthread_create(&thread, &attr, uci_thread, nullptr);
+    pthread_attr_destroy(&attr);
+    pthread_join(thread, nullptr);
 
-  pthread_t thread;
-  pthread_attr_t attr;
-  pthread_attr_init(&attr);
-  pthread_attr_setstacksize(&attr, 256 * 1024 * 1024);
-  pthread_create(&thread, &attr, uci_thread, nullptr);
-  pthread_attr_destroy(&attr);
-  pthread_join(thread, nullptr);
-
-  return 0;
+    return 0;
 }

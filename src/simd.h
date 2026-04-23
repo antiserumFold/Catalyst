@@ -16,32 +16,8 @@
 
 #pragma once
 
-// ============================================================
-// simd.h — SIMD-accelerated kernels for Catalyst NNUE
-//
-// Provides five operations:
-//   1. simd_add_weights      — accumulator += feature column
-//   2. simd_sub_weights      — accumulator -= feature column
-//   3. simd_add_sub_weights  — accumulator += col_add - col_sub  (fused move)
-//   4. simd_screlu_forward   — SCReLU dot product for one accumulator half:
-//                              sum += clamp(acc[i], 0, QA)^2 * weight[i]
-//   5. simd_init_accumulator — acc[i] = bias[i]
-//
-// Architecture tiers (auto-selected at compile time):
-//   AVX-512 VNNI  — 512-bit, fused dot-product (fastest)
-//   AVX-512 F+BW  — 512-bit without VNNI
-//   AVX2          — 256-bit (most common modern x86)
-//   SSE4.1        — 128-bit fallback
-//   Scalar        — pure C++ fallback (ARM / unknown)
-//
-// HIDDEN_SIZE must be a multiple of the widest register's lane count.
-// 256 satisfies all tiers (multiple of 32, 16, 8).
-// ============================================================
-
 #include "intrinsics.h"
 #include <cstdint>
-
-// ── Detect available ISA ──────────────────────────────────────────────────────
 
 #if defined(__AVX512VNNI__) && defined(__AVX512BW__) && defined(__AVX512F__)
 #define SIMD_AVX512VNNI 1
@@ -60,15 +36,8 @@
 namespace Catalyst {
 namespace SIMD {
 
-    // ── SCReLU clamp bounds (must match QA in nnue.h) ────────────────────────────
     inline constexpr int16_t SCRELU_MIN = 0;
-    inline constexpr int16_t SCRELU_MAX = 255;  // must equal NNUE::QA
-
-    // ============================================================
-    // 1.  simd_add_weights
-    //     acc[i] += col[i]   for i in [0, HIDDEN_SIZE)
-    //     Both pointers must be 64-byte aligned.
-    // ============================================================
+    inline constexpr int16_t SCRELU_MAX = 255;
 
     template <int HIDDEN_SIZE>
     FORCE_INLINE void simd_add_weights(int16_t *__restrict__ acc, const int16_t *__restrict__ col) {
@@ -105,11 +74,6 @@ namespace SIMD {
 #endif
     }
 
-    // ============================================================
-    // 2.  simd_sub_weights
-    //     acc[i] -= col[i]   for i in [0, HIDDEN_SIZE)
-    // ============================================================
-
     template <int HIDDEN_SIZE>
     FORCE_INLINE void simd_sub_weights(int16_t *__restrict__ acc, const int16_t *__restrict__ col) {
 #if defined(SIMD_AVX512VNNI) || defined(SIMD_AVX512)
@@ -144,11 +108,6 @@ namespace SIMD {
             acc[i] -= col[i];
 #endif
     }
-
-    // ============================================================
-    // 3.  simd_add_sub_weights  (fused move: remove from + add to)
-    //     acc[i] += col_add[i] - col_sub[i]
-    // ============================================================
 
     template <int HIDDEN_SIZE>
     FORCE_INLINE void simd_add_sub_weights(int16_t *__restrict__ acc,
@@ -192,28 +151,6 @@ namespace SIMD {
             acc[i] += col_add[i] - col_sub[i];
 #endif
     }
-
-    // ============================================================
-    // 4.  simd_screlu_forward
-    //
-    //     One half of the SCReLU forward pass:
-    //       sum += clamp(acc[i], 0, QA)^2 * weights[i]
-    //     for i in [0, HIDDEN_SIZE).
-    //
-    //     Returns the int32_t dot product for one accumulator half.
-    //     Call twice — once for stm_acc (weights[0..HS-1]),
-    //     once for nstm_acc (weights[HS..2*HS-1]).
-    //
-    //     QA=255: max pre-square value 255, max squared 65025 — does NOT
-    //     fit in int16 (max 32767).  We widen to int32 before squaring.
-    //     Max term: 65025 * 32767 ~ 2.13e9, fits in int32.
-    //     Accumulating HIDDEN_SIZE=256 such terms: max ~5.45e11, needs int64.
-    //     The SIMD paths accumulate int32 and return int32 — the caller
-    //     (evaluate()) widens to int64 before summing the two halves.
-    //     For HIDDEN_SIZE=256 the per-half max is ~2.74e11, which overflows
-    //     int32 in the worst case.  The int64 widen in evaluate() is therefore
-    //     load-bearing — do not remove it.
-    // ============================================================
 
     template <int HIDDEN_SIZE>
     FORCE_INLINE int32_t simd_screlu_forward(
@@ -371,11 +308,6 @@ namespace SIMD {
         return result;
 #endif
     }
-
-    // ============================================================
-    // 5.  simd_init_accumulator
-    //     acc[i] = bias[i]
-    // ============================================================
 
     template <int HIDDEN_SIZE>
     FORCE_INLINE void simd_init_accumulator(
