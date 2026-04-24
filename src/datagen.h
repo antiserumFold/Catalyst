@@ -32,7 +32,7 @@ namespace Datagen {
         int         verify_depth     = 10;
         int         verify_limit     = 500;
         int         random_plies_min = 8;
-        int         random_plies_max = 9;
+        int         random_plies_max = 16;
     };
 
     DatagenConfig parse_config(const std::string &args);

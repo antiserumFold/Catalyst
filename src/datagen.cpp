@@ -47,15 +47,16 @@ namespace Datagen {
         std::signal(SIGINT, [](int) { g_stop.store(true, std::memory_order_seq_cst); });
     }
 
-    static constexpr int WIN_ADJ_SCORE    = 1000;
+    static constexpr int WIN_ADJ_SCORE    = 1200;
     static constexpr int WIN_ADJ_PLIES    = 5;
     static constexpr int DRAW_ADJ_SCORE   = 10;
-    static constexpr int DRAW_ADJ_MIN_PLY = 60;
+    static constexpr int DRAW_ADJ_MIN_PLY = 70;
     static constexpr int DRAW_ADJ_PLIES   = 10;
     static constexpr int MAX_GAME_PLY     = 400;
     static constexpr int MAX_POSITIONS    = 50;
     static constexpr int SCORE_CLAMP      = 3000;
     static constexpr int FLUSH_EVERY      = 100;
+    static constexpr int MATE_SCORE       = 20000;
 
     // clang-format off
     static constexpr std::array<int, 64> kCenterBonus = {
@@ -172,6 +173,8 @@ namespace Datagen {
             ++game)
         {
             Board board;
+            tt.clear();
+
             if (!book.empty())
             {
                 std::uniform_int_distribution<size_t> pick(0, book.size() - 1);
@@ -263,6 +266,12 @@ namespace Datagen {
 
                 int white_score = (board.side_to_move() == WHITE) ? score : -score;
 
+                if (std::abs(score) >= MATE_SCORE)
+                {
+                    result = (white_score > 0) ? 2 : 0;
+                    break;
+                }
+
                 bool in_check = board.in_check();
                 bool is_noisy = board.is_capture(best) || is_promotion(best);
 
@@ -294,12 +303,12 @@ namespace Datagen {
 
                 if (win_plies >= WIN_ADJ_PLIES)
                 {
-                    result = (board.side_to_move() == WHITE) ? 2 : 0;
+                    result = (white_score > 0) ? 2 : 0;
                     break;
                 }
                 if (loss_plies >= WIN_ADJ_PLIES)
                 {
-                    result = (board.side_to_move() == WHITE) ? 0 : 2;
+                    result = (white_score > 0) ? 2 : 0;
                     break;
                 }
                 if (draw_plies >= DRAW_ADJ_PLIES)
