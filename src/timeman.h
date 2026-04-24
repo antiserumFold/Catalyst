@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include "types.h"
+
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <limits>
-
-#include "types.h"
 
 namespace Catalyst {
 

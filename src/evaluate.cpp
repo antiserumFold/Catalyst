@@ -20,15 +20,14 @@
 #include "nnue.h"
 #include "types.h"
 
-namespace Catalyst
-{
+namespace Catalyst {
 
-  int evaluate(const Board &board)
-  {
+int evaluate(const Board &board)
+{
     if (!board.pieces(KING, WHITE) || !board.pieces(KING, BLACK))
-      return 0;
+        return 0;
 
     return NNUE::evaluate(board);
-  }
+}
 
-} // namespace Catalyst
+}  // namespace Catalyst

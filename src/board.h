@@ -16,37 +16,37 @@
 
 #pragma once
 
-#include <string>
-
 #include "types.h"
+
+#include <string>
 
 namespace Catalyst {
 
 namespace Zobrist {
-extern Key psq[PIECE_NB][SQUARE_NB];
-extern Key enpassant[FILE_NB];
-extern Key castling[CASTLING_RIGHTS_NB];
-extern Key side;
+    extern Key psq[PIECE_NB][SQUARE_NB];
+    extern Key enpassant[FILE_NB];
+    extern Key castling[CASTLING_RIGHTS_NB];
+    extern Key side;
 
-void init();
-} // namespace Zobrist
+    void init();
+}  // namespace Zobrist
 
 struct alignas(64) StateInfo {
-  Key key;
-  Key pawnKey;
-  Key nonPawnKey[COLOR_NB];
-  int castlingRights;
-  Square epSquare;
-  int rule50;
-  int pliesFromNull;
+    Key    key;
+    Key    pawnKey;
+    Key    nonPawnKey[COLOR_NB];
+    int    castlingRights;
+    Square epSquare;
+    int    rule50;
+    int    pliesFromNull;
 
-  Bitboard checkersBB;
-  Bitboard blockersForKing[COLOR_NB];
-  Bitboard pinners[COLOR_NB];
-  Piece capturedPiece;
-  uint8_t _pad[7];
+    Bitboard checkersBB;
+    Bitboard blockersForKing[COLOR_NB];
+    Bitboard pinners[COLOR_NB];
+    Piece    capturedPiece;
+    uint8_t  _pad[7];
 
-  StateInfo* previous;
+    StateInfo *previous;
 };
 static_assert(sizeof(StateInfo) == 128, "StateInfo size mismatch — check padding");
 
@@ -65,25 +65,25 @@ inline constexpr int CASTLING_RIGHTS_MASK[SQUARE_NB] = {
 
 class alignas(64) Board {
 public:
-  Board();
-  ~Board() = default;
+    Board();
+    ~Board() = default;
 
-  Board(const Board&) = delete;
-  Board& operator=(const Board&) = delete;
-  Board(Board&&) = default;
-  Board& operator=(Board&&) = default;
+    Board(const Board &)            = delete;
+    Board &operator=(const Board &) = delete;
+    Board(Board &&)                 = default;
+    Board &operator=(Board &&)      = default;
 
-  void set_fen(const std::string& fen);
-  std::string get_fen() const;
-  void set_startpos();
+    void        set_fen(const std::string &fen);
+    std::string get_fen() const;
+    void        set_startpos();
 
-  void make_move(Move m, StateInfo& newSt);
-  void unmake_move(Move m);
-  void make_null_move(StateInfo& newSt);
-  void unmake_null_move();
-  void copy_from(const Board& other);
+    void make_move(Move m, StateInfo &newSt);
+    void unmake_move(Move m);
+    void make_null_move(StateInfo &newSt);
+    void unmake_null_move();
+    void copy_from(const Board &other);
 
-  // clang-format off
+    // clang-format off
   [[nodiscard]] FORCE_INLINE Piece    piece_on(Square sq) const               { return board[sq]; }
   [[nodiscard]] FORCE_INLINE bool     empty(Square sq) const                  { return board[sq] == NO_PIECE; }
   [[nodiscard]] FORCE_INLINE Bitboard pieces() const                          { return byTypeBB[ALL_PIECES]; }
@@ -114,61 +114,63 @@ public:
            (move_type(m) != MT_CASTLING && piece_on(to_sq(m)) != NO_PIECE);
   }
   [[nodiscard]] FORCE_INLINE bool is_capture_or_promotion(Move m) const { return is_capture(m) || is_promotion(m); }
-  // clang-format on
+    // clang-format on
 
-  [[nodiscard]] Square castling_rook_square(CastlingRights cr) const;
-  [[nodiscard]] Bitboard blockers_for_king(Color c) const;
-  [[nodiscard]] Bitboard check_blockers(Color c, Color kingColor) const;
-  [[nodiscard]] Bitboard attackers_to(Square sq) const;
-  [[nodiscard]] Bitboard attackers_to(Square sq, Bitboard occupied) const;
-  [[nodiscard]] Square king_square(Color c) const;
-  [[nodiscard]] bool gives_check(Move m) const;
-  [[nodiscard]] bool is_legal(Move m) const;
-  [[nodiscard]] bool is_pseudo_legal(Move m) const;
-  [[nodiscard]] bool is_draw(int ply) const;
-  [[nodiscard]] bool has_game_cycle(int ply) const;
+    [[nodiscard]] Square   castling_rook_square(CastlingRights cr) const;
+    [[nodiscard]] Bitboard blockers_for_king(Color c) const;
+    [[nodiscard]] Bitboard check_blockers(Color c, Color kingColor) const;
+    [[nodiscard]] Bitboard attackers_to(Square sq) const;
+    [[nodiscard]] Bitboard attackers_to(Square sq, Bitboard occupied) const;
+    [[nodiscard]] Square   king_square(Color c) const;
+    [[nodiscard]] bool     gives_check(Move m) const;
+    [[nodiscard]] bool     is_legal(Move m) const;
+    [[nodiscard]] bool     is_pseudo_legal(Move m) const;
+    [[nodiscard]] bool     is_draw(int ply) const;
+    [[nodiscard]] bool     has_game_cycle(int ply) const;
 
-  void display() const;
+    void display() const;
 
-  static constexpr int MAX_GAME_PLY = 512;
-  Key positionHistory[MAX_GAME_PLY];
-  int historyLen = 0;
+    static constexpr int MAX_GAME_PLY = 512;
+    Key                  positionHistory[MAX_GAME_PLY];
+    int                  historyLen = 0;
 
-  FORCE_INLINE void add_to_history(Key k) {
-    if (historyLen < MAX_GAME_PLY)
-      positionHistory[historyLen++] = k;
-  }
-  FORCE_INLINE void remove_from_history() {
-    if (historyLen > 0)
-      --historyLen;
-  }
+    FORCE_INLINE void add_to_history(Key k)
+    {
+        if (historyLen < MAX_GAME_PLY)
+            positionHistory[historyLen++] = k;
+    }
+    FORCE_INLINE void remove_from_history()
+    {
+        if (historyLen > 0)
+            --historyLen;
+    }
 
-  [[nodiscard]] bool is_repetition(int ply) const;
+    [[nodiscard]] bool is_repetition(int ply) const;
 
 private:
-  alignas(64) Bitboard byTypeBB[PIECE_TYPE_NB];
-  alignas(64) Bitboard byColorBB[COLOR_NB];
-  alignas(64) Piece board[SQUARE_NB];
+    alignas(64) Bitboard byTypeBB[PIECE_TYPE_NB];
+    alignas(64) Bitboard byColorBB[COLOR_NB];
+    alignas(64) Piece board[SQUARE_NB];
 
-  StateInfo startState;
-  Color sideToMove;
-  StateInfo* st;
-  int gamePly;
+    StateInfo  startState;
+    Color      sideToMove;
+    StateInfo *st;
+    int        gamePly;
 
-  Bitboard castlingPath[CASTLING_RIGHTS_NB];
-  Square castlingRookSquare[CASTLING_RIGHTS_NB];
+    Bitboard castlingPath[CASTLING_RIGHTS_NB];
+    Square   castlingRookSquare[CASTLING_RIGHTS_NB];
 
-  void clear();
-  void put_piece(Piece pc, Square sq);
-  void remove_piece(Square sq);
-  void move_piece(Square from, Square to);
-  void set_state(StateInfo* si);
-  void update_state(StateInfo* si);
-  void update_blockers(StateInfo* si);
-  Key compute_pawn_key() const;
-  Key compute_non_pawn_key(Color c) const;
+    void clear();
+    void put_piece(Piece pc, Square sq);
+    void remove_piece(Square sq);
+    void move_piece(Square from, Square to);
+    void set_state(StateInfo *si);
+    void update_state(StateInfo *si);
+    void update_blockers(StateInfo *si);
+    Key  compute_pawn_key() const;
+    Key  compute_non_pawn_key(Color c) const;
 
-  template <bool AfterMove> Key compute_key() const;
+    template <bool AfterMove> Key compute_key() const;
 };
 
-} // namespace Catalyst
+}  // namespace Catalyst

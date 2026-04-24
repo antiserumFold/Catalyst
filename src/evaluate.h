@@ -21,6 +21,6 @@
 
 namespace Catalyst {
 
-[[nodiscard]] int evaluate(const Board& board);
+[[nodiscard]] int evaluate(const Board &board);
 
-} // namespace Catalyst
+}  // namespace Catalyst

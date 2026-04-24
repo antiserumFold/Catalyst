@@ -16,14 +16,6 @@
 
 #include "uci.h"
 
-#include <algorithm>
-#include <cassert>
-#include <cstdint>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <thread>
-
 #include "benchmark.h"
 #include "board.h"
 #include "datagen.h"
@@ -34,13 +26,22 @@
 #include "tt.h"
 #include "types.h"
 
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <thread>
+
 #ifdef TUNING
 #include "tuning.h"
 #endif
 
 namespace Catalyst {
 
-[[nodiscard]] static uint64_t perft(Board &board, int depth) {
+[[nodiscard]] static uint64_t perft(Board &board, int depth)
+{
     if (depth == 0)
         return 1ULL;
     MoveList moves = generate_legal(board);
@@ -59,20 +60,24 @@ namespace Catalyst {
 
 UCI::UCI()
     : pool_(std::make_unique<ThreadPool>(1))
-    , moveHistory(std::make_unique<StateInfo[]>(1024)) {
+    , moveHistory(std::make_unique<StateInfo[]>(1024))
+{
     board.set_startpos();
 }
 
-UCI::~UCI() {
+UCI::~UCI()
+{
     join_search();
 }
 
-void UCI::join_search() {
+void UCI::join_search()
+{
     if (searchThread_.joinable())
         searchThread_.join();
 }
 
-void UCI::loop() {
+void UCI::loop()
+{
     std::string line, token;
     std::cout.setf(std::ios::unitbuf);
 
@@ -149,7 +154,8 @@ void UCI::loop() {
     }
 }
 
-void UCI::cmd_uci() {
+void UCI::cmd_uci()
+{
     int hwThreads = std::max(1, int(std::thread::hardware_concurrency()));
 
     std::cout << "id name " << ENGINE_NAME << " " << ENGINE_VERSION << "\n"
@@ -166,12 +172,14 @@ void UCI::cmd_uci() {
     std::cout.flush();
 }
 
-void UCI::cmd_isready() {
+void UCI::cmd_isready()
+{
     std::cout << "readyok\n";
     std::cout.flush();
 }
 
-void UCI::cmd_ucinewgame() {
+void UCI::cmd_ucinewgame()
+{
     board.set_startpos();
     tt.clear();
     pool_->clear_all();
@@ -180,7 +188,8 @@ void UCI::cmd_ucinewgame() {
     isPondering_     = false;
 }
 
-void UCI::cmd_position(std::istringstream &iss) {
+void UCI::cmd_position(std::istringstream &iss)
+{
     pool_->stop();
     join_search();
     moveHistoryCount = 0;
@@ -209,7 +218,8 @@ void UCI::cmd_position(std::istringstream &iss) {
         apply_moves(iss);
 }
 
-void UCI::cmd_go(std::istringstream &iss) {
+void UCI::cmd_go(std::istringstream &iss)
+{
     pool_->stop();
     join_search();
 
@@ -312,7 +322,8 @@ void UCI::cmd_go(std::istringstream &iss) {
     });
 }
 
-void UCI::cmd_ponderhit() {
+void UCI::cmd_ponderhit()
+{
     if (!isPondering_)
     {
         cmd_stop();
@@ -321,12 +332,14 @@ void UCI::cmd_ponderhit() {
     timeman.ponderhit(ponderStm_, options.moveOverhead);
 }
 
-void UCI::cmd_stop() {
+void UCI::cmd_stop()
+{
     pool_->stop();
     join_search();
 }
 
-void UCI::cmd_setoption(std::istringstream &iss) {
+void UCI::cmd_setoption(std::istringstream &iss)
+{
     std::string token, name, value;
 
     iss >> token;
@@ -374,7 +387,8 @@ void UCI::cmd_setoption(std::istringstream &iss) {
     }
 }
 
-void UCI::cmd_bench(std::istringstream &iss) {
+void UCI::cmd_bench(std::istringstream &iss)
+{
     int         benchDepth = 13;
     int         threads    = 0;
     std::string token;
@@ -391,18 +405,21 @@ void UCI::cmd_bench(std::istringstream &iss) {
     board.set_startpos();
 }
 
-void UCI::cmd_display() {
+void UCI::cmd_display()
+{
     board.display();
 }
 
-void UCI::cmd_eval() {
+void UCI::cmd_eval()
+{
     int score = NNUE::evaluate(board);
     std::cout << "NNUE eval (STM): " << score << " cp\n";
     std::cout << "Side to move: " << (board.side_to_move() == WHITE ? "white" : "black") << "\n";
     std::cout.flush();
 }
 
-void UCI::cmd_perft(std::istringstream &iss) {
+void UCI::cmd_perft(std::istringstream &iss)
+{
     int depth = 1;
     iss >> depth;
 
@@ -431,7 +448,8 @@ void UCI::cmd_perft(std::istringstream &iss) {
     std::cout.flush();
 }
 
-void UCI::apply_moves(std::istringstream &iss) {
+void UCI::apply_moves(std::istringstream &iss)
+{
     std::string moveStr;
     while (iss >> moveStr)
     {
@@ -456,7 +474,8 @@ void UCI::apply_moves(std::istringstream &iss) {
     }
 }
 
-void UCI::cmd_datagen(std::istringstream &iss) {
+void UCI::cmd_datagen(std::istringstream &iss)
+{
     Datagen::DatagenConfig cfg;
     std::string            token;
     while (iss >> token)

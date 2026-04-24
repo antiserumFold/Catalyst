@@ -16,11 +16,11 @@
 
 #pragma once
 
+#include "types.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-
-#include "types.h"
 
 namespace Catalyst {
 
@@ -29,7 +29,12 @@ constexpr int TT_DEPTH_OFFSET = 7;
 constexpr uint8_t TT_AGE_INC  = 8;
 constexpr uint8_t TT_AGE_MASK = 0xF8;
 
-enum TTFlag : uint8_t { TT_NONE = 0, TT_EXACT = 1, TT_LOWER = 2, TT_UPPER = 3 };
+enum TTFlag : uint8_t {
+    TT_NONE  = 0,
+    TT_EXACT = 1,
+    TT_LOWER = 2,
+    TT_UPPER = 3
+};
 
 struct TTEntry {
     uint32_t hashKey;
@@ -86,7 +91,8 @@ private:
     size_t     numClusters = 0;
     uint8_t    currentGen  = 0;
 
-    [[nodiscard]] FORCE_INLINE size_t index(Key key) const {
+    [[nodiscard]] FORCE_INLINE size_t index(Key key) const
+    {
 #ifdef __SIZEOF_INT128__
         return static_cast<size_t>(
             (static_cast<__uint128_t>(key) * static_cast<__uint128_t>(numClusters)) >> 64);
@@ -102,7 +108,8 @@ private:
 #endif
     }
 
-    [[nodiscard]] FORCE_INLINE int replacement_score(const TTEntry &e) const {
+    [[nodiscard]] FORCE_INLINE int replacement_score(const TTEntry &e) const
+    {
         uint8_t age = (currentGen - (e.agePvBound & TT_AGE_MASK)) & TT_AGE_MASK;
         return int(e.depth) - int(age) * 2;
     }
@@ -110,7 +117,8 @@ private:
 
 extern TT tt;
 
-[[nodiscard]] FORCE_INLINE int score_to_tt(int score, int ply) {
+[[nodiscard]] FORCE_INLINE int score_to_tt(int score, int ply)
+{
     if (score >= SCORE_MATE_IN_MAX_PLY)
         return score + ply;
     if (score <= -SCORE_MATE_IN_MAX_PLY)
@@ -118,7 +126,8 @@ extern TT tt;
     return score;
 }
 
-[[nodiscard]] FORCE_INLINE int score_from_tt(int score, int ply) {
+[[nodiscard]] FORCE_INLINE int score_from_tt(int score, int ply)
+{
     if (score >= SCORE_MATE_IN_MAX_PLY)
         return score - ply;
     if (score <= -SCORE_MATE_IN_MAX_PLY)

@@ -34,7 +34,8 @@ inline constexpr int PAWN_HISTORY_SIZE = 16384;
 inline constexpr int QUIET_PRUNE_DISABLED = -32000000;
 
 // Pawn history index helper
-[[nodiscard]] FORCE_INLINE int pawn_history_index(Key pawnKey) {
+[[nodiscard]] FORCE_INLINE int pawn_history_index(Key pawnKey)
+{
     return int(pawnKey & (PAWN_HISTORY_SIZE - 1));
 }
 
@@ -73,27 +74,27 @@ struct MoveBuffer {
 class MovePicker {
 public:
     // Normal search constructor
-    MovePicker(const Board         &b,
-               Move                 ttMove,
-               int                  ply,
-               Move                 killer1,
-               Move                 killer2,
-               Move                 counter,
-               const ButterflyHistory &hist,
-               const CaptureHistory   &captHist,
-               const PawnHistory      &pawnHist,
-               const ContinuationHistory *contHist1,
-               const ContinuationHistory *contHist2,
-               const ContinuationHistory *contHist4,
-               MoveBuffer           &buf);
+    MovePicker(const Board        &b,
+        Move                       ttMove,
+        int                        ply,
+        Move                       killer1,
+        Move                       killer2,
+        Move                       counter,
+        const ButterflyHistory    &hist,
+        const CaptureHistory      &captHist,
+        const PawnHistory         &pawnHist,
+        const ContinuationHistory *contHist1,
+        const ContinuationHistory *contHist2,
+        const ContinuationHistory *contHist4,
+        MoveBuffer                &buf);
 
     // Qsearch / probcut constructor
-    MovePicker(const Board         &b,
-               Move                 ttMove,
-               int                  seeThreshold,
-               bool                 qsearchOnly,
-               const CaptureHistory &captHist,
-               MoveBuffer           &buf);
+    MovePicker(const Board   &b,
+        Move                  ttMove,
+        int                   seeThreshold,
+        bool                  qsearchOnly,
+        const CaptureHistory &captHist,
+        MoveBuffer           &buf);
 
     // Set quiet pruning threshold (called by search before move loop)
     void set_quiet_threshold(int threshold) { quietThreshold_ = threshold; }
@@ -136,8 +137,9 @@ public:
 };
 
 // Gravity/clamp history update to prevent overflow
-inline void update_history(int &entry, int bonus) {
+inline void update_history(int &entry, int bonus)
+{
     entry += bonus - entry * std::abs(bonus) / HISTORY_MAX;
 }
 
-} // namespace Catalyst
+}  // namespace Catalyst

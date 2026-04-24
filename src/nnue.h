@@ -16,15 +16,15 @@
 
 #pragma once
 
+#include "board.h"
+#include "simd.h"
+#include "types.h"
+
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <string>
-#include <algorithm>
-
-#include "board.h"
-#include "simd.h"
-#include "types.h"
 
 namespace Catalyst {
 namespace NNUE {
@@ -41,10 +41,12 @@ namespace NNUE {
     struct alignas(64) Accumulator {
         std::array<int16_t, HIDDEN_SIZE> vals;
 
-        void init(const int16_t *bias) {
+        void init(const int16_t *bias)
+        {
             std::memcpy(vals.data(), bias, HIDDEN_SIZE * sizeof(int16_t));
         }
-        void copy_from(const Accumulator &o) {
+        void copy_from(const Accumulator &o)
+        {
             std::memcpy(vals.data(), o.vals.data(), HIDDEN_SIZE * sizeof(int16_t));
         }
     };
@@ -61,7 +63,8 @@ namespace NNUE {
         AccumulatorPair       &current() { return stack[top]; }
         const AccumulatorPair &current() const { return stack[top]; }
 
-        void push() {
+        void push()
+        {
             stack[top + 1] = stack[top];
             ++top;
         }
@@ -79,16 +82,19 @@ namespace NNUE {
 
     bool load(const std::string &path);
 
-    [[nodiscard]] inline int output_bucket(const Board &board) {
+    [[nodiscard]] inline int output_bucket(const Board &board)
+    {
         int pieces = BitCount(board.pieces()) - 2;
         return std::clamp(pieces / BUCKET_DIVISOR, 0, OUTPUT_BUCKETS - 1);
     }
 
-    [[nodiscard]] inline int white_idx(Color pc_color, PieceType pt, Square sq) {
+    [[nodiscard]] inline int white_idx(Color pc_color, PieceType pt, Square sq)
+    {
         return (pc_color == BLACK ? 384 : 0) + (int(pt) - 1) * 64 + int(sq);
     }
 
-    [[nodiscard]] inline int black_idx(Color pc_color, PieceType pt, Square sq) {
+    [[nodiscard]] inline int black_idx(Color pc_color, PieceType pt, Square sq)
+    {
         Square sq_flipped = Square(int(sq) ^ 56);
         return (pc_color == WHITE ? 384 : 0) + (int(pt) - 1) * 64 + int(sq_flipped);
     }

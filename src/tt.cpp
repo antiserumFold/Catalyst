@@ -34,11 +34,13 @@ namespace Catalyst {
 
 TT tt;
 
-TT::TT() {
+TT::TT()
+{
     resize(64);
 }
 
-TT::~TT() {
+TT::~TT()
+{
     if (table)
     {
 #if defined(_WIN32)
@@ -50,7 +52,8 @@ TT::~TT() {
     }
 }
 
-void TT::resize(size_t mb) {
+void TT::resize(size_t mb)
+{
     mb = std::max(mb, size_t(1));
 
     if (table)
@@ -101,7 +104,8 @@ void TT::resize(size_t mb) {
     clear();
 }
 
-void TT::clear() {
+void TT::clear()
+{
     if (!table)
         return;
 
@@ -129,11 +133,13 @@ void TT::clear() {
     currentGen = 0;
 }
 
-void TT::new_search() {
+void TT::new_search()
+{
     currentGen += TT_AGE_INC;
 }
 
-void TT::prefetch(Key key) const {
+void TT::prefetch(Key key) const
+{
     if (!table)
         return;
     const void *addr = &table[index(key)];
@@ -144,7 +150,8 @@ void TT::prefetch(Key key) const {
 #endif
 }
 
-TTEntry *TT::probe(Key key, bool &found) {
+TTEntry *TT::probe(Key key, bool &found)
+{
     TTCluster     *cluster = &table[index(key)];
     const uint32_t key32   = uint32_t(key);
 
@@ -184,8 +191,15 @@ TTEntry *TT::probe(Key key, bool &found) {
     return replace;
 }
 
-void TT::store(
-    Key key, int score, int depth, TTFlag flag, Move move, int eval, int rule50, bool isPv) {
+void TT::store(Key key,
+    int            score,
+    int            depth,
+    TTFlag         flag,
+    Move           move,
+    int            eval,
+    int            rule50,
+    bool           isPv)
+{
     TTCluster     *cluster = &table[index(key)];
     const uint32_t key32   = uint32_t(key);
 
@@ -247,7 +261,8 @@ write:
     replace->agePvBound = currentGen | (isPv ? 0x4 : 0x0) | uint8_t(flag);
 }
 
-int TT::hashfull() const {
+int TT::hashfull() const
+{
     if (!table || numClusters == 0)
         return 0;
 

@@ -19,18 +19,21 @@
 #include "nnue.h"
 #include "types.h"
 #include "uci.h"
+
 #include <iostream>
 #include <pthread.h>
 
 using namespace Catalyst;
 
-static void *uci_thread(void *) {
+static void *uci_thread(void *)
+{
     UCI uci;
     uci.loop();
     return nullptr;
 }
 
-int main() {
+int main()
+{
     init_bitboards();
     Zobrist::init();
     NNUE::load("catalyst.nnue");

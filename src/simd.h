@@ -17,6 +17,7 @@
 #pragma once
 
 #include "intrinsics.h"
+
 #include <cstdint>
 
 #if defined(__AVX512VNNI__) && defined(__AVX512BW__) && defined(__AVX512F__)
@@ -40,7 +41,8 @@ namespace SIMD {
     inline constexpr int16_t SCRELU_MAX = 255;
 
     template <int HIDDEN_SIZE>
-    FORCE_INLINE void simd_add_weights(int16_t *__restrict__ acc, const int16_t *__restrict__ col) {
+    FORCE_INLINE void simd_add_weights(int16_t *__restrict__ acc, const int16_t *__restrict__ col)
+    {
 #if defined(SIMD_AVX512VNNI) || defined(SIMD_AVX512)
         static_assert(HIDDEN_SIZE % 32 == 0, "HIDDEN_SIZE must be multiple of 32");
         constexpr int ITERS = HIDDEN_SIZE / 32;
@@ -75,7 +77,8 @@ namespace SIMD {
     }
 
     template <int HIDDEN_SIZE>
-    FORCE_INLINE void simd_sub_weights(int16_t *__restrict__ acc, const int16_t *__restrict__ col) {
+    FORCE_INLINE void simd_sub_weights(int16_t *__restrict__ acc, const int16_t *__restrict__ col)
+    {
 #if defined(SIMD_AVX512VNNI) || defined(SIMD_AVX512)
         static_assert(HIDDEN_SIZE % 32 == 0, "HIDDEN_SIZE must be multiple of 32");
         constexpr int ITERS = HIDDEN_SIZE / 32;
@@ -112,7 +115,8 @@ namespace SIMD {
     template <int HIDDEN_SIZE>
     FORCE_INLINE void simd_add_sub_weights(int16_t *__restrict__ acc,
         const int16_t *__restrict__ col_add,
-        const int16_t *__restrict__ col_sub) {
+        const int16_t *__restrict__ col_sub)
+    {
 #if defined(SIMD_AVX512VNNI) || defined(SIMD_AVX512)
         static_assert(HIDDEN_SIZE % 32 == 0, "HIDDEN_SIZE must be multiple of 32");
         constexpr int ITERS = HIDDEN_SIZE / 32;
@@ -153,8 +157,9 @@ namespace SIMD {
     }
 
     template <int HIDDEN_SIZE>
-    FORCE_INLINE int32_t simd_screlu_forward(
-        const int16_t *__restrict__ acc, const int16_t *__restrict__ weights) {
+    FORCE_INLINE int32_t simd_screlu_forward(const int16_t *__restrict__ acc,
+        const int16_t *__restrict__ weights)
+    {
 #if defined(SIMD_AVX512VNNI)
         static_assert(HIDDEN_SIZE % 32 == 0, "HIDDEN_SIZE must be multiple of 32");
         constexpr int ITERS = HIDDEN_SIZE / 32;
@@ -225,8 +230,8 @@ namespace SIMD {
                 return _mm512_inserti64x4(_mm512_castsi256_si512(r_lo), r_hi, 1);
             };
 
-            sum = _mm512_add_epi32(
-                sum, _mm512_add_epi32(accum256(x_lo, w_lo), accum256(x_hi, w_hi)));
+            sum = _mm512_add_epi32(sum,
+                _mm512_add_epi32(accum256(x_lo, w_lo), accum256(x_hi, w_hi)));
         }
 
         return _mm512_reduce_add_epi32(sum);
@@ -310,8 +315,9 @@ namespace SIMD {
     }
 
     template <int HIDDEN_SIZE>
-    FORCE_INLINE void simd_init_accumulator(
-        int16_t *__restrict__ acc, const int16_t *__restrict__ bias) {
+    FORCE_INLINE void simd_init_accumulator(int16_t *__restrict__ acc,
+        const int16_t *__restrict__ bias)
+    {
 #if defined(SIMD_AVX512VNNI) || defined(SIMD_AVX512)
         static_assert(HIDDEN_SIZE % 32 == 0);
         constexpr int ITERS = HIDDEN_SIZE / 32;

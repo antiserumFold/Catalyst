@@ -16,15 +16,15 @@
 
 #pragma once
 
+#include "board.h"
+#include "thread.h"
+#include "timeman.h"
+
 #include <atomic>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <thread>
-
-#include "board.h"
-#include "thread.h"
-#include "timeman.h"
 
 namespace Catalyst {
 

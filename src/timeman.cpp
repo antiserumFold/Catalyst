@@ -22,7 +22,8 @@
 
 namespace Catalyst {
 
-static int compute_moves_to_go(int remaining, int movestogo) {
+static int compute_moves_to_go(int remaining, int movestogo)
+{
     if (movestogo > 0)
         return std::clamp(movestogo, 2, 60);
     if (remaining > 60000)
@@ -40,7 +41,8 @@ static void compute_limits(int remaining,
     double                     maxHardMult,
     int                       &outOptimal,
     int                       &outMax,
-    int                       &outBase) {
+    int                       &outBase)
+{
     if (remaining < 100)
     {
         outBase    = std::max(1, remaining / 8);
@@ -70,7 +72,8 @@ static void compute_limits(int remaining,
     outMax     = std::clamp(hard, outOptimal, safe);
 }
 
-void TimeManager::init(const SearchLimits &limits, Color stm, int moveOverhead) {
+void TimeManager::init(const SearchLimits &limits, Color stm, int moveOverhead)
+{
     lims           = limits;
     optimalMs      = 0;
     maxMs          = 0;
@@ -84,7 +87,7 @@ void TimeManager::init(const SearchLimits &limits, Color stm, int moveOverhead) 
 
     effectiveSoftNodes_ = limits.softNodes;
     effectiveHardNodes_ = limits.hardNodes > 0 ? limits.hardNodes
-        : limits.nodes > 0                     ? limits.nodes
+                          : limits.nodes > 0   ? limits.nodes
                                                : 0;
 
     if (limits.ponder || limits.infinite)
@@ -103,16 +106,23 @@ void TimeManager::init(const SearchLimits &limits, Color stm, int moveOverhead) 
     int inc       = (stm == WHITE) ? limits.winc : limits.binc;
     remainingMs_  = remaining;
 
-    compute_limits(
-        remaining, inc, limits.movestogo, MAX_HARD_MULT, optimalMs, maxMs, baseOptimalMs);
+    compute_limits(remaining,
+        inc,
+        limits.movestogo,
+        MAX_HARD_MULT,
+        optimalMs,
+        maxMs,
+        baseOptimalMs);
 }
 
-void TimeManager::start_clock() {
+void TimeManager::start_clock()
+{
     startTime = std::chrono::steady_clock::now();
     stopped.store(false, std::memory_order_relaxed);
 }
 
-void TimeManager::ponderhit(Color stm, int moveOverhead) {
+void TimeManager::ponderhit(Color stm, int moveOverhead)
+{
     pondering_.store(false, std::memory_order_relaxed);
     startTime   = std::chrono::steady_clock::now();
     lims.ponder = false;
@@ -138,7 +148,8 @@ void TimeManager::update_scale(bool bestMoveChanged,
     uint64_t                        bestMoveNodes,
     uint64_t                        totalNodes,
     int                             currentDepth,
-    int                             currentScore) {
+    int                             currentScore)
+{
     if (lims.movetime > 0 || lims.infinite || baseOptimalMs <= 0)
         return;
 
@@ -171,13 +182,15 @@ void TimeManager::update_scale(bool bestMoveChanged,
     if (hasDepth1Score && currentDepth > 1)
     {
         double complexity = COMPLEXITY_LOG_FACTOR * std::abs(double(scoreAtDepth1 - currentScore))
-            * std::log(double(currentDepth));
-        complexityFactor = std::max(
-            COMPLEXITY_BASE + std::min(complexity, COMPLEXITY_MAX) / COMPLEXITY_DIVISOR, 1.0);
+                            * std::log(double(currentDepth));
+        complexityFactor
+            = std::max(COMPLEXITY_BASE + std::min(complexity, COMPLEXITY_MAX) / COMPLEXITY_DIVISOR,
+                1.0);
     }
 
-    double target = std::clamp(
-        stabilityFactor * scoreFactor * nodeFactor * complexityFactor, MIN_SCALE, MAX_SCALE);
+    double target = std::clamp(stabilityFactor * scoreFactor * nodeFactor * complexityFactor,
+        MIN_SCALE,
+        MAX_SCALE);
 
     scale = std::clamp(0.70 * target + 0.30 * scale, MIN_SCALE, MAX_SCALE);
 
@@ -186,13 +199,15 @@ void TimeManager::update_scale(bool bestMoveChanged,
     optimalMs = std::clamp(int(double(baseOptimalMs) * scale), 10, std::min(maxMs, safeRemaining));
 }
 
-int TimeManager::elapsed_ms() const {
+int TimeManager::elapsed_ms() const
+{
     return int(std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - startTime)
             .count());
 }
 
-bool TimeManager::time_up(uint64_t nodes) const {
+bool TimeManager::time_up(uint64_t nodes) const
+{
     if (stopped.load(std::memory_order_relaxed))
         return true;
     if (pondering_.load(std::memory_order_relaxed))
@@ -210,7 +225,8 @@ bool TimeManager::time_up(uint64_t nodes) const {
     return elapsed_ms() >= maxMs;
 }
 
-bool TimeManager::soft_limit_reached(uint64_t nodes) const {
+bool TimeManager::soft_limit_reached(uint64_t nodes) const
+{
     if (stopped.load(std::memory_order_relaxed))
         return true;
     if (pondering_.load(std::memory_order_relaxed))

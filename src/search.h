@@ -22,6 +22,7 @@
 #include "timeman.h"
 #include "tt.h"
 #include "types.h"
+
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -126,7 +127,8 @@ struct SearchInfo {
     Move     bestMove      = MOVE_NONE;
     int      lastScore     = 0;
 
-    void reset() {
+    void reset()
+    {
         nodes = bestMoveNodes = 0;
         depth = selDepth = lastScore = 0;
         bestMove                     = MOVE_NONE;
@@ -142,7 +144,8 @@ public:
     std::atomic<bool>      stopped { false };
 
     Move best_move(Board &board, TimeManager &tm);
-    void stop() {
+    void stop()
+    {
         if (tm_)
             tm_->stop();
     }
@@ -150,11 +153,13 @@ public:
     int      last_score() const { return info_.lastScore; }
     void     clear_tables();
 
-    Move ponder_move() const {
+    Move ponder_move() const
+    {
         return (pvTable_[0].length >= 2) ? pvTable_[0].moves[1] : MOVE_NONE;
     }
 
-    [[nodiscard]] bool see_ge(const Board &board, Move m, int threshold) const {
+    [[nodiscard]] bool see_ge(const Board &board, Move m, int threshold) const
+    {
         MoveBuffer tmpBuf;
         MovePicker tmp(board, MOVE_NONE, 0, true, captureHistory_, tmpBuf);
         return tmp.see_ge(m, threshold);
@@ -211,24 +216,35 @@ private:
     int quiescence(Board &board, int alpha, int beta, int ply);
 
     int  adjusted_eval(const Board &board, int ply);
-    void update_correction(
-        const Board &board, int ply, int staticEval, int searchScore, int depth, bool bestIsCap);
+    void update_correction(const Board &board,
+        int                             ply,
+        int                             staticEval,
+        int                             searchScore,
+        int                             depth,
+        bool                            bestIsCap);
 
-    static int stat_bonus(int depth) {
+    static int stat_bonus(int depth)
+    {
         return std::min(STAT_BONUS_MULT * depth + STAT_BONUS_BASE, STAT_BONUS_MAX);
     }
-    static int stat_malus(int depth) {
+    static int stat_malus(int depth)
+    {
         return std::min(STAT_MALUS_MULT * depth - STAT_MALUS_BASE, STAT_MALUS_MAX);
     }
     static void gravity(int &e, int bonus, int max) { e += bonus - e * std::abs(bonus) / max; }
 
-    [[nodiscard]] int quiet_hist_score(
-        const Board &board, Color us, Move m, PieceType movedPt, int ply) const;
-    [[nodiscard]] int capture_hist_score(
-        Color us, Move m, PieceType movedPt, PieceType capturedPt) const;
-    void update_killers(Move m, int ply);
-    void update_counter(Color us, Move prevMove, Move reply);
-    void update_quiet_histories(const Board &board,
+    [[nodiscard]] int quiet_hist_score(const Board &board,
+        Color                                       us,
+        Move                                        m,
+        PieceType                                   movedPt,
+        int                                         ply) const;
+    [[nodiscard]] int capture_hist_score(Color us,
+        Move                                   m,
+        PieceType                              movedPt,
+        PieceType                              capturedPt) const;
+    void              update_killers(Move m, int ply);
+    void              update_counter(Color us, Move prevMove, Move reply);
+    void              update_quiet_histories(const Board &board,
         Color                                us,
         Move                                 bestMove,
         PieceType                            bestPt,
@@ -236,7 +252,7 @@ private:
         int                                  ply,
         Move                                *tried,
         int                                  triedCount);
-    void update_capture_histories(const Board &board,
+    void              update_capture_histories(const Board &board,
         Color                                  us,
         Move                                   bestMove,
         PieceType                              bestPt,
@@ -247,7 +263,8 @@ private:
         PieceType                             *triedCaptPts,
         int                                    triedCount);
 
-    ContinuationHistory *cont_hist(Color us, PieceType pt, Square to) {
+    ContinuationHistory *cont_hist(Color us, PieceType pt, Square to)
+    {
         return &contHistTable_[us][pt][to];
     }
 
@@ -261,8 +278,11 @@ private:
 
     static bool is_mate_score(int s) { return std::abs(s) >= SCORE_MATE_IN_MAX_PLY; }
 
-    void print_info(
-        const Board &board, int depth, int score, int elapsed, uint64_t reportNodes) const;
+    void print_info(const Board &board,
+        int                      depth,
+        int                      score,
+        int                      elapsed,
+        uint64_t                 reportNodes) const;
 };
 
-} // namespace Catalyst
+}  // namespace Catalyst

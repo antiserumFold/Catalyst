@@ -21,13 +21,13 @@
 
 namespace Catalyst {
 
-template <GenType GT> Move* generate(const Board& board, Move* list);
+template <GenType GT> Move *generate(const Board &board, Move *list);
 
-extern template Move* generate<ALL_MOVES>(const Board&, Move*);
-extern template Move* generate<CAPTURES>(const Board&, Move*);
-extern template Move* generate<QUIETS>(const Board&, Move*);
+extern template Move *generate<ALL_MOVES>(const Board &, Move *);
+extern template Move *generate<CAPTURES>(const Board &, Move *);
+extern template Move *generate<QUIETS>(const Board &, Move *);
 
-MoveList generate_legal(Board& board);
-int count_legal(Board& board);
+MoveList generate_legal(Board &board);
+int      count_legal(Board &board);
 
-} // namespace Catalyst
+}  // namespace Catalyst

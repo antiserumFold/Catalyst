@@ -16,11 +16,11 @@
 
 #include "movepick.h"
 
-#include <algorithm>
-#include <climits>
-
 #include "bitboard.h"
 #include "movegen.h"
+
+#include <algorithm>
+#include <climits>
 
 namespace Catalyst {
 
@@ -88,7 +88,8 @@ MovePicker::MovePicker(const Board &b,
     , quietEnd(0)
     , badCaptCur(0)
     , seeThreshold(SEE_CAPTURE_THRESHOLD)
-    , qsearchMode(false) {
+    , qsearchMode(false)
+{
     if (ttMove != MOVE_NONE
         && (board.piece_on(from_sq(ttMove)) == NO_PIECE
             || piece_color(board.piece_on(from_sq(ttMove))) != board.side_to_move()
@@ -124,7 +125,8 @@ MovePicker::MovePicker(const Board &b,
     , quietEnd(0)
     , badCaptCur(0)
     , seeThreshold(threshold)
-    , qsearchMode(true) {
+    , qsearchMode(true)
+{
     if (ttMove != MOVE_NONE
         && (board.piece_on(from_sq(ttMove)) == NO_PIECE
             || piece_color(board.piece_on(from_sq(ttMove))) != board.side_to_move()
@@ -134,12 +136,12 @@ MovePicker::MovePicker(const Board &b,
         ttMove = MOVE_NONE;
 }
 
-Move MovePicker::next_move() {
+Move MovePicker::next_move()
+{
     while (true)
     {
         switch (stage)
         {
-
         case STAGE_TT:
             stage = STAGE_INIT_CAPTURES;
             if (ttMove != MOVE_NONE)
@@ -229,7 +231,8 @@ Move MovePicker::next_move() {
     }
 }
 
-void MovePicker::generate_and_score_captures() {
+void MovePicker::generate_and_score_captures()
+{
     Move *endPtr = generate<CAPTURES>(board, moves);
     captEnd      = int(endPtr - moves);
 
@@ -255,7 +258,8 @@ void MovePicker::generate_and_score_captures() {
     goodCaptEnd = goodCount;
 }
 
-void MovePicker::generate_and_score_quiets() {
+void MovePicker::generate_and_score_quiets()
+{
     Move *quietStart = moves + captEnd;
     Move *endPtr     = generate<QUIETS>(board, quietStart);
     quietEnd         = int(endPtr - moves);
@@ -368,7 +372,8 @@ void MovePicker::generate_and_score_quiets() {
     }
 }
 
-int MovePicker::score_capture(Move m) const {
+int MovePicker::score_capture(Move m) const
+{
     if (is_en_passant(m))
         return MVV_LVA[PAWN][PAWN] + 5000;
 
@@ -397,7 +402,8 @@ int MovePicker::score_capture(Move m) const {
     return score;
 }
 
-void MovePicker::select_best(int begin, int end) {
+void MovePicker::select_best(int begin, int end)
+{
     int bestIdx   = begin;
     int bestScore = scores[begin];
     for (int i = begin + 1; i < end; ++i)
@@ -415,7 +421,8 @@ void MovePicker::select_best(int begin, int end) {
     }
 }
 
-bool MovePicker::see_ge(Move m, int threshold) const {
+bool MovePicker::see_ge(Move m, int threshold) const
+{
     if (is_en_passant(m))
         return threshold <= 0;
 
@@ -439,11 +446,11 @@ bool MovePicker::see_ge(Move m, int threshold) const {
     Bitboard occ       = board.pieces() ^ square_bb(from) ^ square_bb(to);
     Color    side      = ~board.side_to_move();
     Bitboard attackers = (pawn_attacks(WHITE, to) & board.pieces(PAWN, BLACK))
-        | (pawn_attacks(BLACK, to) & board.pieces(PAWN, WHITE))
-        | (knight_attacks(to) & board.pieces(KNIGHT))
-        | (bishop_attacks(to, occ) & board.pieces(BISHOP, QUEEN))
-        | (rook_attacks(to, occ) & board.pieces(ROOK, QUEEN))
-        | (king_attacks(to) & board.pieces(KING));
+                         | (pawn_attacks(BLACK, to) & board.pieces(PAWN, WHITE))
+                         | (knight_attacks(to) & board.pieces(KNIGHT))
+                         | (bishop_attacks(to, occ) & board.pieces(BISHOP, QUEEN))
+                         | (rook_attacks(to, occ) & board.pieces(ROOK, QUEEN))
+                         | (king_attacks(to) & board.pieces(KING));
     attackers &= occ;
 
     int balance = gain - nextVal - threshold;

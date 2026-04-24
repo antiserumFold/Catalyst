@@ -16,6 +16,13 @@
 
 #include "datagen.h"
 
+#include "board.h"
+#include "movegen.h"
+#include "search.h"
+#include "timeman.h"
+#include "tt.h"
+#include "types.h"
+
 #include <atomic>
 #include <cassert>
 #include <csignal>
@@ -28,13 +35,6 @@
 #include <thread>
 #include <vector>
 
-#include "board.h"
-#include "movegen.h"
-#include "search.h"
-#include "timeman.h"
-#include "tt.h"
-#include "types.h"
-
 namespace Catalyst {
 namespace Datagen {
 
@@ -42,7 +42,8 @@ namespace Datagen {
     static std::atomic<uint64_t> g_positions { 0 };
     static std::atomic<uint64_t> g_games { 0 };
 
-    static void install_sigint_handler() {
+    static void install_sigint_handler()
+    {
         std::signal(SIGINT, [](int) { g_stop.store(true, std::memory_order_seq_cst); });
     }
 
@@ -74,7 +75,8 @@ namespace Datagen {
         int         score;
     };
 
-    static Move pick_weighted_move(const MoveList &moves, Color stm, std::mt19937_64 &rng) {
+    static Move pick_weighted_move(const MoveList &moves, Color stm, std::mt19937_64 &rng)
+    {
         std::vector<int> weights;
         weights.reserve(moves.size());
         for (int i = 0; i < (int)moves.size(); ++i)
@@ -88,7 +90,8 @@ namespace Datagen {
         return moves.moves[dist(rng)];
     }
 
-    static std::vector<std::string> load_book(const std::string &path) {
+    static std::vector<std::string> load_book(const std::string &path)
+    {
         std::vector<std::string> fens;
         if (path.empty())
             return fens;
@@ -122,8 +125,10 @@ namespace Datagen {
         return fens;
     }
 
-    static void sample_positions(
-        std::vector<PosEntry> &positions, int max_count, std::mt19937_64 &rng) {
+    static void sample_positions(std::vector<PosEntry> &positions,
+        int                                             max_count,
+        std::mt19937_64                                &rng)
+    {
         const int n = (int)positions.size();
         if (n <= max_count)
             return;
@@ -140,8 +145,10 @@ namespace Datagen {
         positions = std::move(sampled);
     }
 
-    static void datagen_thread(
-        int thread_id, const DatagenConfig &cfg, const std::vector<std::string> &book) {
+    static void datagen_thread(int      thread_id,
+        const DatagenConfig            &cfg,
+        const std::vector<std::string> &book)
+    {
         const std::string thread_file = cfg.output_path + ".t" + std::to_string(thread_id);
         std::ofstream     out(thread_file, std::ios::app);
         if (!out)
@@ -161,7 +168,7 @@ namespace Datagen {
         int       games_since_flush = 0;
 
         for (int game = 0; !g_stop.load(std::memory_order_relaxed)
-            && (target_games == 0 || int(g_games.load()) < target_games);
+                           && (target_games == 0 || int(g_games.load()) < target_games);
             ++game)
         {
             Board board;
@@ -331,7 +338,8 @@ namespace Datagen {
         out.close();
     }
 
-    static void merge_files(const DatagenConfig &cfg) {
+    static void merge_files(const DatagenConfig &cfg)
+    {
         std::ofstream merged(cfg.output_path, std::ios::app);
         if (!merged)
         {
@@ -349,7 +357,8 @@ namespace Datagen {
         }
     }
 
-    void run(const DatagenConfig &cfg) {
+    void run(const DatagenConfig &cfg)
+    {
         std::cerr << "Datagen: " << cfg.threads << " threads"
                   << ", soft nodes=" << cfg.soft_nodes << ", hard nodes=" << cfg.hard_nodes
                   << ", games=" << (cfg.games == 0 ? "unlimited" : std::to_string(cfg.games))
@@ -382,7 +391,8 @@ namespace Datagen {
                   << " positions\n";
     }
 
-    DatagenConfig parse_config(const std::string &args) {
+    DatagenConfig parse_config(const std::string &args)
+    {
         DatagenConfig      cfg;
         std::istringstream iss(args);
         std::string        token;

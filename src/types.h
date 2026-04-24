@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "intrinsics.h"
+
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -24,74 +26,75 @@
 #include <string>
 #include <string_view>
 
-#include "intrinsics.h"
-
 namespace Catalyst {
 
 // Engine Info
-inline constexpr std::string_view ENGINE_NAME = "Catalyst";
+inline constexpr std::string_view ENGINE_NAME    = "Catalyst";
 inline constexpr std::string_view ENGINE_VERSION = "v3.0.0";
-inline constexpr std::string_view ENGINE_AUTHOR = "Anany Tanwar";
+inline constexpr std::string_view ENGINE_AUTHOR  = "Anany Tanwar";
 
 // Type Aliases
 using Bitboard = uint64_t;
-using Key = uint64_t;
+using Key      = uint64_t;
 using TbResult = uint32_t;
-using Score = int;
-using Move = uint16_t;
-using Depth = int8_t;
+using Score    = int;
+using Move     = uint16_t;
+using Depth    = int8_t;
 
 // Limits
-inline constexpr int MAX_PLY = 128;
+inline constexpr int MAX_PLY   = 128;
 inline constexpr int MAX_MOVES = 512;
 inline constexpr int MAX_DEPTH = 64;
 
 // Score Constants
-inline constexpr Score SCORE_DRAW = 0;
-inline constexpr Score SCORE_MATE = 32000;
-inline constexpr Score SCORE_INFINITE = 32001;
-inline constexpr Score SCORE_NONE = 32002;
-inline constexpr Score SCORE_MATE_IN_MAX_PLY = SCORE_MATE - MAX_PLY;
-inline constexpr Score SCORE_TB_WIN = SCORE_MATE_IN_MAX_PLY - 1;
-inline constexpr Score SCORE_TB_WIN_IN_MAX_PLY = SCORE_TB_WIN - MAX_PLY;
+inline constexpr Score SCORE_DRAW               = 0;
+inline constexpr Score SCORE_MATE               = 32000;
+inline constexpr Score SCORE_INFINITE           = 32001;
+inline constexpr Score SCORE_NONE               = 32002;
+inline constexpr Score SCORE_MATE_IN_MAX_PLY    = SCORE_MATE - MAX_PLY;
+inline constexpr Score SCORE_TB_WIN             = SCORE_MATE_IN_MAX_PLY - 1;
+inline constexpr Score SCORE_TB_WIN_IN_MAX_PLY  = SCORE_TB_WIN - MAX_PLY;
 inline constexpr Score SCORE_TB_LOSS_IN_MAX_PLY = -SCORE_TB_WIN_IN_MAX_PLY;
 
 inline constexpr Move MOVE_NONE = 0;
 static_assert(SCORE_MATE_IN_MAX_PLY > SCORE_TB_WIN, "Score ordering broken");
 
 struct MoveList {
-  Move moves[MAX_MOVES];
-  int count = 0;
+    Move moves[MAX_MOVES];
+    int  count = 0;
 
-  void push(Move m) { moves[count++] = m; }
-  Move* begin() { return moves; }
-  Move* end() { return moves + count; }
-  int size() const { return count; }
-  bool empty() const { return count == 0; }
-  void clear() { count = 0; }
+    void  push(Move m) { moves[count++] = m; }
+    Move *begin() { return moves; }
+    Move *end() { return moves + count; }
+    int   size() const { return count; }
+    bool  empty() const { return count == 0; }
+    void  clear() { count = 0; }
 };
 
 struct PvList {
-  Move moves[MAX_PLY];
-  int length = 0;
+    Move moves[MAX_PLY];
+    int  length = 0;
 
-  void update(Move m, const PvList& child) {
-    moves[0] = m;
-    for (int i = 0; i < child.length; ++i)
-      moves[i + 1] = child.moves[i];
-    length = child.length + 1;
-  }
+    void update(Move m, const PvList &child)
+    {
+        moves[0] = m;
+        for (int i = 0; i < child.length; ++i)
+            moves[i + 1] = child.moves[i];
+        length = child.length + 1;
+    }
 };
 
 inline constexpr size_t CACHE_LINE_SIZE = 64;
 
-[[nodiscard]] FORCE_INLINE int BitCount(uint64_t x) {
-  return popcount(x);
+[[nodiscard]] FORCE_INLINE int BitCount(uint64_t x)
+{
+    return popcount(x);
 }
 
-[[nodiscard]] inline int64_t timeMillis() {
-  auto sinceEpoch = std::chrono::steady_clock::now().time_since_epoch();
-  return std::chrono::duration_cast<std::chrono::milliseconds>(sinceEpoch).count();
+[[nodiscard]] inline int64_t timeMillis()
+{
+    auto sinceEpoch = std::chrono::steady_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(sinceEpoch).count();
 }
 
 // clang-format off
@@ -155,20 +158,23 @@ enum Piece : uint8_t {
 };
 // clang-format on
 
-[[nodiscard]] constexpr Piece makePiece(Color c, PieceType pt) {
-  return Piece((c << 3) | pt);
+[[nodiscard]] constexpr Piece makePiece(Color c, PieceType pt)
+{
+    return Piece((c << 3) | pt);
 }
-[[nodiscard]] constexpr PieceType piece_type(Piece pc) {
-  return PieceType(pc & 7);
+[[nodiscard]] constexpr PieceType piece_type(Piece pc)
+{
+    return PieceType(pc & 7);
 }
-[[nodiscard]] constexpr Color piece_color(Piece pc) {
-  return Color(pc >> 3);
+[[nodiscard]] constexpr Color piece_color(Piece pc)
+{
+    return Color(pc >> 3);
 }
 
-inline constexpr int PIECE_VALUE[PIECE_TYPE_NB] = {0, 100, 320, 330, 500, 900, 0, 0};
+inline constexpr int PIECE_VALUE[PIECE_TYPE_NB] = { 0, 100, 320, 330, 500, 900, 0, 0 };
 
 struct CastlingData {
-  Square kingSrc, kingDest, rookSrc, rookDest;
+    Square kingSrc, kingDest, rookSrc, rookDest;
 };
 
 // clang-format off
@@ -203,25 +209,31 @@ inline constexpr Bitboard CASTLING_PATH[CASTLING_RIGHTS_NB] = {
 };
 // clang-format on
 
-[[nodiscard]] constexpr Square makeSquare(File f, Rank r) {
-  return Square((r << 3) | f);
+[[nodiscard]] constexpr Square makeSquare(File f, Rank r)
+{
+    return Square((r << 3) | f);
 }
-[[nodiscard]] constexpr File fileOf(Square s) {
-  return File(s & 7);
+[[nodiscard]] constexpr File fileOf(Square s)
+{
+    return File(s & 7);
 }
-[[nodiscard]] constexpr Rank rankOf(Square s) {
-  return Rank(s >> 3);
+[[nodiscard]] constexpr Rank rankOf(Square s)
+{
+    return Rank(s >> 3);
 }
 
-[[nodiscard]] constexpr Square relative_square(Color c, Square s) {
-  return (c == WHITE) ? s : Square(s ^ 56);
+[[nodiscard]] constexpr Square relative_square(Color c, Square s)
+{
+    return (c == WHITE) ? s : Square(s ^ 56);
 }
 
-[[nodiscard]] constexpr Rank relative_rank(Color c, Rank r) {
-  return Rank(r ^ (c * 7));
+[[nodiscard]] constexpr Rank relative_rank(Color c, Rank r)
+{
+    return Rank(r ^ (c * 7));
 }
-[[nodiscard]] constexpr bool is_ok(Square s) {
-  return s >= SQ_A1 && s < SQ_NONE;
+[[nodiscard]] constexpr bool is_ok(Square s)
+{
+    return s >= SQ_A1 && s < SQ_NONE;
 }
 
 // clang-format off
@@ -247,37 +259,47 @@ inline constexpr Bitboard LightSquares = 0x55AA55AA55AA55AAULL;
 inline constexpr Bitboard DarkSquares  = 0xAA55AA55AA55AA55ULL;
 // clang-format on
 
-[[nodiscard]] FORCE_INLINE constexpr Bitboard square_bb(Square s) {
-  return 1ULL << s;
+[[nodiscard]] FORCE_INLINE constexpr Bitboard square_bb(Square s)
+{
+    return 1ULL << s;
 }
-[[nodiscard]] FORCE_INLINE constexpr Bitboard file_bb(File f) {
-  return FileABB << f;
+[[nodiscard]] FORCE_INLINE constexpr Bitboard file_bb(File f)
+{
+    return FileABB << f;
 }
-[[nodiscard]] FORCE_INLINE constexpr Bitboard file_bb(Square s) {
-  return file_bb(fileOf(s));
+[[nodiscard]] FORCE_INLINE constexpr Bitboard file_bb(Square s)
+{
+    return file_bb(fileOf(s));
 }
-[[nodiscard]] FORCE_INLINE constexpr Bitboard rank_bb(Rank r) {
-  return Rank1BB << (8 * r);
+[[nodiscard]] FORCE_INLINE constexpr Bitboard rank_bb(Rank r)
+{
+    return Rank1BB << (8 * r);
 }
-[[nodiscard]] FORCE_INLINE constexpr Bitboard rank_bb(Square s) {
-  return rank_bb(rankOf(s));
+[[nodiscard]] FORCE_INLINE constexpr Bitboard rank_bb(Square s)
+{
+    return rank_bb(rankOf(s));
 }
-[[nodiscard]] FORCE_INLINE constexpr bool more_than_one(Bitboard b) {
-  return b & (b - 1);
+[[nodiscard]] FORCE_INLINE constexpr bool more_than_one(Bitboard b)
+{
+    return b & (b - 1);
 }
 
-[[nodiscard]] FORCE_INLINE constexpr bool opposite_colors(Square s1, Square s2) {
-  return ((int(fileOf(s1)) ^ int(rankOf(s1)) ^ int(fileOf(s2)) ^ int(rankOf(s2))) & 1);
+[[nodiscard]] FORCE_INLINE constexpr bool opposite_colors(Square s1, Square s2)
+{
+    return ((int(fileOf(s1)) ^ int(rankOf(s1)) ^ int(fileOf(s2)) ^ int(rankOf(s2))) & 1);
 }
 
-[[nodiscard]] constexpr bool is_mate_score(Score s) {
-  return std::abs(s) >= SCORE_MATE_IN_MAX_PLY;
+[[nodiscard]] constexpr bool is_mate_score(Score s)
+{
+    return std::abs(s) >= SCORE_MATE_IN_MAX_PLY;
 }
-[[nodiscard]] constexpr Score mate_in(int ply) {
-  return SCORE_MATE - ply;
+[[nodiscard]] constexpr Score mate_in(int ply)
+{
+    return SCORE_MATE - ply;
 }
-[[nodiscard]] constexpr Score mated_in(int ply) {
-  return -SCORE_MATE + ply;
+[[nodiscard]] constexpr Score mated_in(int ply)
+{
+    return -SCORE_MATE + ply;
 }
 
 // clang-format off
@@ -316,115 +338,137 @@ ENABLE_LOGIC_OPERATORS_ON(CastlingRights)
 #undef ENABLE_LOGIC_OPERATORS_ON
 #undef ENABLE_INCR_OPERATORS_ON
 
-[[nodiscard]] constexpr Color operator~(Color c) {
-  return Color(c ^ 1);
+[[nodiscard]] constexpr Color operator~(Color c)
+{
+    return Color(c ^ 1);
 }
 
-[[nodiscard]] FORCE_INLINE constexpr Square operator+(Square s, Direction d) {
-  return Square(int(s) + int(d));
+[[nodiscard]] FORCE_INLINE constexpr Square operator+(Square s, Direction d)
+{
+    return Square(int(s) + int(d));
 }
 
-[[nodiscard]] FORCE_INLINE constexpr Square operator-(Square s, Direction d) {
-  return Square(int(s) - int(d));
+[[nodiscard]] FORCE_INLINE constexpr Square operator-(Square s, Direction d)
+{
+    return Square(int(s) - int(d));
 }
-inline Square& operator+=(Square& s, Direction d) {
-  return s = s + d;
+inline Square &operator+=(Square &s, Direction d)
+{
+    return s = s + d;
 }
-inline Square& operator-=(Square& s, Direction d) {
-  return s = s - d;
-}
-
-[[nodiscard]] inline std::string square_to_string(Square s) {
-  if (s >= SQ_NONE)
-    return "-";
-  char str[3];
-  str[0] = char('a' + fileOf(s));
-  str[1] = char('1' + rankOf(s));
-  str[2] = '\0';
-  return std::string(str, 2);
+inline Square &operator-=(Square &s, Direction d)
+{
+    return s = s - d;
 }
 
-[[nodiscard]] inline Square string_to_square(const std::string& s) {
-  if (s.size() < 2)
-    return SQ_NONE;
-  int f = s[0] - 'a';
-  int r = s[1] - '1';
-  if (f < 0 || f >= FILE_NB || r < 0 || r >= RANK_NB)
-    return SQ_NONE;
-  return makeSquare(File(f), Rank(r));
+[[nodiscard]] inline std::string square_to_string(Square s)
+{
+    if (s >= SQ_NONE)
+        return "-";
+    char str[3];
+    str[0] = char('a' + fileOf(s));
+    str[1] = char('1' + rankOf(s));
+    str[2] = '\0';
+    return std::string(str, 2);
 }
 
-inline std::ostream& operator<<(std::ostream& os, Square s) {
-  os << square_to_string(s);
-  return os;
+[[nodiscard]] inline Square string_to_square(const std::string &s)
+{
+    if (s.size() < 2)
+        return SQ_NONE;
+    int f = s[0] - 'a';
+    int r = s[1] - '1';
+    if (f < 0 || f >= FILE_NB || r < 0 || r >= RANK_NB)
+        return SQ_NONE;
+    return makeSquare(File(f), Rank(r));
 }
 
-inline std::ostream& operator<<(std::ostream& os, Color c) {
-  os << (c == WHITE ? std::string_view("white") : std::string_view("black"));
-  return os;
+inline std::ostream &operator<<(std::ostream &os, Square s)
+{
+    os << square_to_string(s);
+    return os;
+}
+
+inline std::ostream &operator<<(std::ostream &os, Color c)
+{
+    os << (c == WHITE ? std::string_view("white") : std::string_view("black"));
+    return os;
 }
 
 // Move encoding: [from: 6][to: 6][type: 2][promo: 2]
-inline constexpr PieceType PROMO_PIECES[4] = {KNIGHT, BISHOP, ROOK, QUEEN};
+inline constexpr PieceType PROMO_PIECES[4] = { KNIGHT, BISHOP, ROOK, QUEEN };
 
-[[nodiscard]] FORCE_INLINE constexpr Square from_sq(Move m) {
-  return Square(m & 0x3F);
+[[nodiscard]] FORCE_INLINE constexpr Square from_sq(Move m)
+{
+    return Square(m & 0x3F);
 }
-[[nodiscard]] FORCE_INLINE constexpr Square to_sq(Move m) {
-  return Square((m >> 6) & 0x3F);
+[[nodiscard]] FORCE_INLINE constexpr Square to_sq(Move m)
+{
+    return Square((m >> 6) & 0x3F);
 }
-[[nodiscard]] FORCE_INLINE constexpr MoveType move_type(Move m) {
-  return MoveType((m >> 12) & 0x3);
+[[nodiscard]] FORCE_INLINE constexpr MoveType move_type(Move m)
+{
+    return MoveType((m >> 12) & 0x3);
 }
-[[nodiscard]] FORCE_INLINE constexpr PieceType promo_piece(Move m) {
-  return PROMO_PIECES[(m >> 14) & 0x3];
-}
-
-[[nodiscard]] FORCE_INLINE constexpr Move make_move(Square from, Square to) {
-  return Move(from | (to << 6));
-}
-
-[[nodiscard]] FORCE_INLINE constexpr Move make_move(Square from, Square to, MoveType mt,
-                                                    PieceType promo = KNIGHT) {
-  int promoIdx = (promo == KNIGHT) ? 0 : (promo == BISHOP) ? 1 : (promo == ROOK) ? 2 : 3;
-  return Move(from | (to << 6) | (mt << 12) | (promoIdx << 14));
+[[nodiscard]] FORCE_INLINE constexpr PieceType promo_piece(Move m)
+{
+    return PROMO_PIECES[(m >> 14) & 0x3];
 }
 
-[[nodiscard]] FORCE_INLINE constexpr bool is_promotion(Move m) {
-  return move_type(m) == MT_PROMOTION;
-}
-[[nodiscard]] FORCE_INLINE constexpr bool is_castling(Move m) {
-  return move_type(m) == MT_CASTLING;
-}
-[[nodiscard]] FORCE_INLINE constexpr bool is_en_passant(Move m) {
-  return move_type(m) == MT_EN_PASSANT;
+[[nodiscard]] FORCE_INLINE constexpr Move make_move(Square from, Square to)
+{
+    return Move(from | (to << 6));
 }
 
-[[nodiscard]] inline std::string move_to_uci(Move m) {
-  if (m == MOVE_NONE)
-    return "0000";
+[[nodiscard]] FORCE_INLINE constexpr Move make_move(Square from,
+    Square                                                 to,
+    MoveType                                               mt,
+    PieceType                                              promo = KNIGHT)
+{
+    int promoIdx = (promo == KNIGHT) ? 0 : (promo == BISHOP) ? 1 : (promo == ROOK) ? 2 : 3;
+    return Move(from | (to << 6) | (mt << 12) | (promoIdx << 14));
+}
 
-  std::string uci = square_to_string(from_sq(m)) + square_to_string(to_sq(m));
+[[nodiscard]] FORCE_INLINE constexpr bool is_promotion(Move m)
+{
+    return move_type(m) == MT_PROMOTION;
+}
+[[nodiscard]] FORCE_INLINE constexpr bool is_castling(Move m)
+{
+    return move_type(m) == MT_CASTLING;
+}
+[[nodiscard]] FORCE_INLINE constexpr bool is_en_passant(Move m)
+{
+    return move_type(m) == MT_EN_PASSANT;
+}
 
-  if (is_promotion(m)) {
-    PieceType promo = promo_piece(m);
-    char promoChar = (promo == KNIGHT)   ? 'n'
-                     : (promo == BISHOP) ? 'b'
-                     : (promo == ROOK)   ? 'r'
-                                         : 'q';
-    uci += promoChar;
-  }
+[[nodiscard]] inline std::string move_to_uci(Move m)
+{
+    if (m == MOVE_NONE)
+        return "0000";
 
-  return uci;
+    std::string uci = square_to_string(from_sq(m)) + square_to_string(to_sq(m));
+
+    if (is_promotion(m))
+    {
+        PieceType promo     = promo_piece(m);
+        char      promoChar = (promo == KNIGHT)   ? 'n'
+                              : (promo == BISHOP) ? 'b'
+                              : (promo == ROOK)   ? 'r'
+                                                  : 'q';
+        uci += promoChar;
+    }
+
+    return uci;
 }
 
 #if defined(__GNUC__) || defined(__clang__)
 #define PREFETCH(addr) __builtin_prefetch(addr, 0, 3)
 #elif defined(_MSC_VER)
 #include <intrin.h>
-#define PREFETCH(addr) _mm_prefetch(reinterpret_cast<const char*>(addr), _MM_HINT_T0)
+#define PREFETCH(addr) _mm_prefetch(reinterpret_cast<const char *>(addr), _MM_HINT_T0)
 #else
 #define PREFETCH(addr) ((void)0)
 #endif
 
-} // namespace Catalyst
+}  // namespace Catalyst

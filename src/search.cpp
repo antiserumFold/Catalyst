@@ -16,12 +16,6 @@
 
 #include "search.h"
 
-#include <algorithm>
-#include <cassert>
-#include <cmath>
-#include <cstdint>
-#include <iostream>
-
 #include "bitboard.h"
 #include "board.h"
 #include "movegen.h"
@@ -30,11 +24,18 @@
 #include "tt.h"
 #include "types.h"
 
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <iostream>
+
 namespace Catalyst {
 
 int LMRTable[2][64][64];
 
-void init_lmr() {
+void init_lmr()
+{
     for (int d = 1; d < 64; ++d)
         for (int m = 1; m < 64; ++m)
         {
@@ -44,12 +45,14 @@ void init_lmr() {
         }
 }
 
-Search::Search() {
+Search::Search()
+{
     init_lmr();
     clear_tables();
 }
 
-void Search::clear_tables() {
+void Search::clear_tables()
+{
     std::memset(history_, 0, sizeof(history_));
     std::memset(captureHistory_, 0, sizeof(captureHistory_));
     std::memset(pawnHistory_, 0, sizeof(pawnHistory_));
@@ -74,7 +77,8 @@ void Search::clear_tables() {
 // ---------------------------------------------------------------------------
 // TT move validation — guards against hash collisions producing garbage moves
 // ---------------------------------------------------------------------------
-bool Search::is_valid_tt_move(const Board &board, Move m) const {
+bool Search::is_valid_tt_move(const Board &board, Move m) const
+{
     if (m == MOVE_NONE)
         return false;
     Square from = from_sq(m);
@@ -96,8 +100,8 @@ bool Search::is_valid_tt_move(const Board &board, Move m) const {
 // ---------------------------------------------------------------------------
 // History helpers
 // ---------------------------------------------------------------------------
-int Search::quiet_hist_score(
-    const Board &board, Color us, Move m, PieceType movedPt, int ply) const {
+int Search::quiet_hist_score(const Board &board, Color us, Move m, PieceType movedPt, int ply) const
+{
     int s = history_[us][from_sq(m)][to_sq(m)];
     s += pawnHistory_[pawn_history_index(board.pawn_key())][movedPt][to_sq(m)];
     const SearchStack *cur = ss(ply);
@@ -110,18 +114,21 @@ int Search::quiet_hist_score(
     return s;
 }
 
-int Search::capture_hist_score(Color us, Move m, PieceType movedPt, PieceType capturedPt) const {
+int Search::capture_hist_score(Color us, Move m, PieceType movedPt, PieceType capturedPt) const
+{
     return captureHistory_[us][movedPt][to_sq(m)][capturedPt];
 }
 
-void Search::update_killers(Move m, int ply) {
+void Search::update_killers(Move m, int ply)
+{
     if (killers_[ply][0] == m)
         return;
     killers_[ply][1] = killers_[ply][0];
     killers_[ply][0] = m;
 }
 
-void Search::update_counter(Color us, Move prevMove, Move reply) {
+void Search::update_counter(Color us, Move prevMove, Move reply)
+{
     if (prevMove != MOVE_NONE && reply != MOVE_NONE)
         counterMoves_[us][from_sq(prevMove)][to_sq(prevMove)] = reply;
 }
@@ -133,7 +140,8 @@ void Search::update_quiet_histories(const Board &board,
     int                                          histDepth,
     int                                          ply,
     Move                                        *tried,
-    int                                          triedCount) {
+    int                                          triedCount)
+{
     int                  bonus = stat_bonus(histDepth);
     int                  malus = -stat_malus(histDepth);
     int                  phIdx = pawn_history_index(board.pawn_key());
@@ -176,7 +184,8 @@ void Search::update_capture_histories(const Board & /*board*/,
     Move      *tried,
     PieceType *triedPts,
     PieceType *triedCaptPts,
-    int        triedCount) {
+    int        triedCount)
+{
     int bonus = stat_bonus(histDepth);
     int malus = -stat_malus(histDepth);
     if (bestMove != MOVE_NONE)
@@ -185,15 +194,17 @@ void Search::update_capture_histories(const Board & /*board*/,
     {
         if (tried[i] == bestMove)
             continue;
-        gravity(
-            captureHistory_[us][triedPts[i]][to_sq(tried[i])][triedCaptPts[i]], malus, HISTORY_MAX);
+        gravity(captureHistory_[us][triedPts[i]][to_sq(tried[i])][triedCaptPts[i]],
+            malus,
+            HISTORY_MAX);
     }
 }
 
 // ---------------------------------------------------------------------------
 // Misc helpers
 // ---------------------------------------------------------------------------
-bool Search::opponent_has_winning_capture(const Board &board) const {
+bool Search::opponent_has_winning_capture(const Board &board) const
+{
     Color    them = ~board.side_to_move();
     Bitboard occ  = board.pieces();
     for (PieceType pt = PAWN; pt <= QUEEN; ++pt)
@@ -237,7 +248,8 @@ bool Search::opponent_has_winning_capture(const Board &board) const {
     return false;
 }
 
-bool Search::is_shuffling(Move m, int ply) const {
+bool Search::is_shuffling(Move m, int ply) const
+{
     if (ply < 4)
         return false;
     const SearchStack *cur = ss(ply);
@@ -255,7 +267,8 @@ bool Search::is_shuffling(Move m, int ply) const {
 // ---------------------------------------------------------------------------
 // Evaluation with correction history and fifty-move scaling
 // ---------------------------------------------------------------------------
-int Search::adjusted_eval(const Board &board, int ply) {
+int Search::adjusted_eval(const Board &board, int ply)
+{
     int   raw = NNUE::evaluate(accStack_, board, board.side_to_move());
     Color us  = board.side_to_move();
 
@@ -284,8 +297,13 @@ int Search::adjusted_eval(const Board &board, int ply) {
     return adjusted * (FIFTY_SCALE_NUM - rule50) / FIFTY_SCALE_NUM;
 }
 
-void Search::update_correction(
-    const Board &board, int ply, int staticEval, int searchScore, int depth, bool bestIsCap) {
+void Search::update_correction(const Board &board,
+    int                                     ply,
+    int                                     staticEval,
+    int                                     searchScore,
+    int                                     depth,
+    bool                                    bestIsCap)
+{
     if (bestIsCap || depth < 2 || staticEval == SCORE_NONE)
         return;
     if (is_mate_score(searchScore) || is_mate_score(staticEval))
@@ -313,7 +331,8 @@ void Search::print_info([[maybe_unused]] const Board &board,
     int                                               depth,
     int                                               score,
     int                                               elapsed,
-    uint64_t                                          reportNodes) const {
+    uint64_t                                          reportNodes) const
+{
     std::cout << "info depth " << depth << " seldepth " << info_.selDepth;
     if (is_mate_score(score))
     {
@@ -341,7 +360,8 @@ void Search::print_info([[maybe_unused]] const Board &board,
 // ---------------------------------------------------------------------------
 // Quiescence search
 // ---------------------------------------------------------------------------
-int Search::quiescence(Board &board, int alpha, int beta, int ply) {
+int Search::quiescence(Board &board, int alpha, int beta, int ply)
+{
     ++info_.nodes;
 
     if ((info_.nodes & ((1 << 15) - 1)) == 0)
@@ -450,7 +470,6 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply) {
             continue;
         if (stateSP_ >= 32767)
         {
-
             continue;
         }
 
@@ -516,7 +535,8 @@ int Search::negamax(Board &board,
     int                    ply,
     bool                   isPV,
     bool                   cutNode,
-    Move                   excludedMove) {
+    Move                   excludedMove)
+{
     ++info_.nodes;
 
     if ((info_.nodes & ((1 << 17) - 1)) == 0)
@@ -610,11 +630,13 @@ int Search::negamax(Board &board,
                     int phIdx = pawn_history_index(board.pawn_key());
                     gravity(pawnHistory_[phIdx][ttPt][to_sq(ttMove)], bonus, HISTORY_MAX);
                     if ((cur - 1)->contHistEntry)
-                        gravity(
-                            (*(cur - 1)->contHistEntry)[ttPt][to_sq(ttMove)], bonus, HISTORY_MAX);
+                        gravity((*(cur - 1)->contHistEntry)[ttPt][to_sq(ttMove)],
+                            bonus,
+                            HISTORY_MAX);
                     if ((cur - 2)->contHistEntry)
-                        gravity(
-                            (*(cur - 2)->contHistEntry)[ttPt][to_sq(ttMove)], bonus, HISTORY_MAX);
+                        gravity((*(cur - 2)->contHistEntry)[ttPt][to_sq(ttMove)],
+                            bonus,
+                            HISTORY_MAX);
                 }
                 return ttScore;
             }
@@ -629,8 +651,9 @@ int Search::negamax(Board &board,
                     int phIdx = pawn_history_index(board.pawn_key());
                     gravity(pawnHistory_[phIdx][ttPt][to_sq(ttMove)], -malus / 2, HISTORY_MAX);
                     if ((cur - 1)->contHistEntry)
-                        gravity(
-                            (*(cur - 1)->contHistEntry)[ttPt][to_sq(ttMove)], -malus, HISTORY_MAX);
+                        gravity((*(cur - 1)->contHistEntry)[ttPt][to_sq(ttMove)],
+                            -malus,
+                            HISTORY_MAX);
                 }
                 return ttScore;
             }
@@ -728,7 +751,7 @@ int Search::negamax(Board &board,
         if (depth < RFP_MAX_DEPTH && !is_mate_score(staticEval))
         {
             int margin = RFP_MARGIN_MULT * depth - (improving ? 80 : 0)
-                - (opponentWorsening ? 20 : 0) - prevHistScore / RFP_HIST_DIV;
+                         - (opponentWorsening ? 20 : 0) - prevHistScore / RFP_HIST_DIV;
             if (staticEval - std::max(margin, 0) >= beta)
                 return ilerp(staticEval, beta, 0.333);
         }
@@ -742,9 +765,9 @@ int Search::negamax(Board &board,
                 | board.pieces(ROOK, board.side_to_move())
                 | board.pieces(QUEEN, board.side_to_move())))
         {
-
-            int R = std::min(
-                NMP_BASE_R + depth / 3 + std::min(2, (staticEval - beta) / NMP_EVAL_DIV), depth);
+            int R
+                = std::min(NMP_BASE_R + depth / 3 + std::min(2, (staticEval - beta) / NMP_EVAL_DIV),
+                    depth);
 
             cur->move          = MOVE_NONE;
             cur->movedPt       = NO_PIECE_TYPE;
@@ -791,7 +814,6 @@ int Search::negamax(Board &board,
     if (!pvNode && !inCheck && excludedMove == MOVE_NONE && depth >= PROBCUT_DEPTH
         && std::abs(beta) < SCORE_MATE_IN_MAX_PLY)
     {
-
         int pcBeta  = beta + PROBCUT_MARGIN - 63 * improving;
         int pcCount = 0;
 
@@ -858,8 +880,8 @@ int Search::negamax(Board &board,
     const Color us       = board.side_to_move();
     const Move  prevMove = (ply > 0) ? (cur - 1)->move : MOVE_NONE;
     const Move  counter  = (prevMove != MOVE_NONE)
-        ? counterMoves_[us][from_sq(prevMove)][to_sq(prevMove)]
-        : MOVE_NONE;
+                               ? counterMoves_[us][from_sq(prevMove)][to_sq(prevMove)]
+                               : MOVE_NONE;
 
     ContinuationHistory *ch1 = (cur - 1)->contHistEntry;
     ContinuationHistory *ch2 = (cur - 2)->contHistEntry;
@@ -909,9 +931,9 @@ int Search::negamax(Board &board,
         const bool      isPromo   = is_promotion(m);
         const bool      isQuiet   = !isCapture && !isPromo;
         const PieceType movedPt   = piece_type(board.piece_on(from_sq(m)));
-        const PieceType captPt    = isCapture
-            ? (is_en_passant(m) ? PAWN : piece_type(board.piece_on(to_sq(m))))
-            : NO_PIECE_TYPE;
+        const PieceType captPt
+            = isCapture ? (is_en_passant(m) ? PAWN : piece_type(board.piece_on(to_sq(m))))
+                        : NO_PIECE_TYPE;
 
         int histScore = isQuiet ? quiet_hist_score(board, us, m, movedPt, ply)
                                 : capture_hist_score(us, m, movedPt, captPt);
@@ -981,7 +1003,6 @@ int Search::negamax(Board &board,
             && ttDepth >= depth - 3 && ttFlag == TT_LOWER
             && std::abs(ttScore) < SCORE_MATE_IN_MAX_PLY && !is_shuffling(m, ply))
         {
-
             int singBeta = ttScore - (53 + 75 * (ttPV && !pvNode)) * depth / 60;
             // Use ply+1 so the recursive call gets its own moveBuf slot
             int singScore
@@ -989,10 +1010,10 @@ int Search::negamax(Board &board,
 
             if (singScore < singBeta)
             {
-                bool doDouble = !pvNode && singScore < singBeta - SE_DOUBLE_MARGIN
-                    && (cur - 1)->doubleExtensions < 3;
-                bool doTriple = !pvNode && singScore < singBeta - SE_TRIPLE_MARGIN
-                    && (cur - 1)->doubleExtensions < 2;
+                bool doDouble         = !pvNode && singScore < singBeta - SE_DOUBLE_MARGIN
+                                        && (cur - 1)->doubleExtensions < 3;
+                bool doTriple         = !pvNode && singScore < singBeta - SE_TRIPLE_MARGIN
+                                        && (cur - 1)->doubleExtensions < 2;
                 ext                   = 1 + doDouble + doTriple;
                 cur->doubleExtensions = (cur - 1)->doubleExtensions + (ext > 1 ? 1 : 0);
                 if (!pvNode && depth < 12)
@@ -1033,12 +1054,10 @@ int Search::negamax(Board &board,
 
         if (!board.is_legal(m))
         {
-
             continue;
         }
         if (stateSP_ >= 32767)
         {
-
             continue;
         }
 
@@ -1068,7 +1087,7 @@ int Search::negamax(Board &board,
         if (moveCount > 1 + rootNode && newDepth >= 2 && !inCheck)
         {
             int R_frac = LMRTable[isQuiet ? 1 : 0][std::min(63, newDepth)][std::min(63, moveCount)]
-                * LMR_FRAC;
+                         * LMR_FRAC;
 
             if (cutNode)
                 R_frac += 2 * LMR_FRAC;
@@ -1173,15 +1192,20 @@ int Search::negamax(Board &board,
         }
         if (alpha >= beta)
         {
-
             int histDepth = depth + (staticEval != SCORE_NONE && staticEval <= origAlpha ? 1 : 0)
-                + (bestScore > beta + 209 ? 1 : 0);
+                            + (bestScore > beta + 209 ? 1 : 0);
 
             if (isQuiet)
             {
                 update_killers(m, ply);
-                update_quiet_histories(
-                    board, us, m, movedPt, histDepth, ply, quietsTried, quietCount);
+                update_quiet_histories(board,
+                    us,
+                    m,
+                    movedPt,
+                    histDepth,
+                    ply,
+                    quietsTried,
+                    quietCount);
                 // All tried captures also failed — penalise them
                 // MOVE_NONE as bestMove means only the malus loop runs
                 if (capsCount > 0)
@@ -1250,7 +1274,6 @@ int Search::negamax(Board &board,
     if (!(stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes))
         && excludedMove == MOVE_NONE && std::abs(bestScore) < SCORE_INFINITE)
     {
-
         TTFlag flag;
         if (alpha >= beta)
             flag = TT_LOWER;
@@ -1280,7 +1303,8 @@ int Search::negamax(Board &board,
 // ---------------------------------------------------------------------------
 // Root search — iterative deepening with aspiration windows
 // ---------------------------------------------------------------------------
-Move Search::best_move(Board &board, TimeManager &tm) {
+Move Search::best_move(Board &board, TimeManager &tm)
+{
     tm_      = &tm;
     stateSP_ = 0;
     if (!isSilent)

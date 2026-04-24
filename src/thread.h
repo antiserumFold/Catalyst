@@ -16,39 +16,39 @@
 
 #pragma once
 
-#include <atomic>
-#include <memory>
-#include <thread>
-#include <vector>
-
 #include "board.h"
 #include "search.h"
 #include "timeman.h"
 #include "types.h"
 
+#include <atomic>
+#include <memory>
+#include <thread>
+#include <vector>
+
 namespace Catalyst {
 
 class ThreadPool {
 public:
-  explicit ThreadPool(int numThreads = 1);
-  ~ThreadPool() = default;
+    explicit ThreadPool(int numThreads = 1);
+    ~ThreadPool() = default;
 
-  void set_threads(int n);
-  Move search(Board& board, TimeManager& tm);
-  void stop();
-  void clear_all();
-  uint64_t total_nodes() const;
-  Move ponder_move() const { return main_->ponder_move(); }
-  int thread_count() const { return int(helpers_.size()) + 1; }
+    void     set_threads(int n);
+    Move     search(Board &board, TimeManager &tm);
+    void     stop();
+    void     clear_all();
+    uint64_t total_nodes() const;
+    Move     ponder_move() const { return main_->ponder_move(); }
+    int      thread_count() const { return int(helpers_.size()) + 1; }
 
 private:
-  std::unique_ptr<Search> main_;
+    std::unique_ptr<Search> main_;
 
-  struct Helper {
-    std::unique_ptr<Search> searcher;
-    std::unique_ptr<Board> board;
-  };
-  std::vector<Helper> helpers_;
+    struct Helper {
+        std::unique_ptr<Search> searcher;
+        std::unique_ptr<Board>  board;
+    };
+    std::vector<Helper> helpers_;
 };
 
-} // namespace Catalyst
+}  // namespace Catalyst
