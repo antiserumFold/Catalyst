@@ -757,9 +757,9 @@ int Search::negamax(Board &board,
         }
 
         // Null move pruning
-        if (depth >= 3 && staticEval >= beta
+        if (cutNode && depth >= 3 && staticEval >= beta
             && staticEval >= beta + NMP_BETA_BASE - NMP_BETA_MULT * depth
-            && (ply == 0 || (cur - 1)->move != MOVE_NONE) && ply >= nmpMinPly_
+            && (cur - 1)->move != MOVE_NONE && ply >= nmpMinPly_
             && (board.pieces(KNIGHT, board.side_to_move())
                 | board.pieces(BISHOP, board.side_to_move())
                 | board.pieces(ROOK, board.side_to_move())
