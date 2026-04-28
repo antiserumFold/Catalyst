@@ -363,13 +363,17 @@ void Search::print_info([[maybe_unused]] const Board &board,
 int Search::quiescence(Board &board, int alpha, int beta, int ply)
 {
     ++info_.nodes;
+    if (sharedNodes_)
+        sharedNodes_->fetch_add(1, std::memory_order_relaxed);
 
     if ((info_.nodes & ((1 << 15) - 1)) == 0)
     {
         if (!isSilent && tm_ && !tm_->is_pondering())
         {
+            uint64_t reportNodes
+                = sharedNodes_ ? sharedNodes_->load(std::memory_order_relaxed) : info_.nodes;
             int elapsed = tm_->elapsed_ms();
-            std::cout << "info nodes " << info_.nodes << " time " << elapsed << "\n";
+            std::cout << "info nodes " << reportNodes << " time " << elapsed << "\n";
             std::cout.flush();
         }
     }
@@ -538,20 +542,24 @@ int Search::negamax(Board &board,
     Move                   excludedMove)
 {
     ++info_.nodes;
+    if (sharedNodes_)
+        sharedNodes_->fetch_add(1, std::memory_order_relaxed);
 
     if ((info_.nodes & ((1 << 17) - 1)) == 0)
     {
         if (!isSilent && tm_ && !tm_->is_pondering())
         {
+            uint64_t reportNodes
+                = sharedNodes_ ? sharedNodes_->load(std::memory_order_relaxed) : info_.nodes;
             int elapsed = tm_->elapsed_ms();
             std::cout << "info depth " << info_.depth << " seldepth " << info_.selDepth << " nodes "
-                      << info_.nodes << " nps "
-                      << (elapsed > 0 ? int(info_.nodes * 1000ULL / uint64_t(elapsed)) : 0)
+                      << reportNodes << " nps "
+                      << (elapsed > 0 ? int(reportNodes * 1000ULL / uint64_t(elapsed)) : 0)
                       << " time " << elapsed << " hashfull " << tt.hashfull() << "\n";
             std::cout.flush();
         }
     }
-
+    
     if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
         return 0;
     if (ply >= MAX_PLY - 1)
