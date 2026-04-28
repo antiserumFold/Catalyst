@@ -64,13 +64,18 @@ uint64_t ThreadPool::total_nodes() const
 
 Move ThreadPool::search(Board &board, TimeManager &tm)
 {
-    // Reset stop flags
     main_->stopped.store(false, std::memory_order_relaxed);
     for (auto &h : helpers_)
         h.searcher->stopped.store(false, std::memory_order_relaxed);
 
     for (auto &h : helpers_)
         h.board->copy_from(board);
+
+    // shared atomic node counter
+    std::atomic<uint64_t> sharedNodes { 0 };
+    main_->sharedNodes_ = &sharedNodes;
+    for (auto &h : helpers_)
+        h.searcher->sharedNodes_ = &sharedNodes;
 
     std::vector<std::thread> threads;
     for (auto &h : helpers_)
@@ -82,14 +87,17 @@ Move ThreadPool::search(Board &board, TimeManager &tm)
 
     Move best = main_->best_move(board, tm);
 
-    // Stop ALL helpers via their own stopped flag
     for (auto &h : helpers_)
         h.searcher->stopped.store(true, std::memory_order_relaxed);
-    // Also stop TM so tm_->time_up() returns true as backup
     tm.stop();
 
     for (auto &t : threads)
         t.join();
+
+    // clear pointers — sharedNodes goes out of scope after this
+    main_->sharedNodes_ = nullptr;
+    for (auto &h : helpers_)
+        h.searcher->sharedNodes_ = nullptr;
 
     return best;
 }
