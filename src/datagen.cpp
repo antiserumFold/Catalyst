@@ -199,8 +199,10 @@ namespace Datagen {
         std::mt19937_64 rng(
             std::random_device { }() ^ (static_cast<uint64_t>(thread_id) * 0x9e3779b97f4a7c15ULL));
 
-        auto searcher      = std::make_unique<Search>();
-        searcher->isSilent = true;
+        auto searcher_white      = std::make_unique<Search>();
+        searcher_white->isSilent = true;
+        auto searcher_black      = std::make_unique<Search>();
+        searcher_black->isSilent = true;
 
         constexpr int STATE_POOL_SIZE = 4096;
         auto          statePool       = std::make_unique<StateInfo[]>(STATE_POOL_SIZE);
@@ -236,7 +238,7 @@ namespace Datagen {
                 const int                          open_plies = ply_dist(rng);
 
                 bool valid = true;
-                for (int i = 0; i < open_plies && sp < STATE_POOL_SIZE - cfg.max_game_ply - 2; ++i)
+                for (int i = 0; i < open_plies && sp < STATE_POOL_SIZE - 2; ++i)
                 {
                     MoveList moves = generate_legal(board);
                     if (moves.empty())
@@ -262,8 +264,8 @@ namespace Datagen {
                 vtm.init(vl, board.side_to_move(), 0);
                 vtm.start_clock();
 
-                searcher->best_move(board, vtm);
-                const int vscore = searcher->last_score();
+                searcher_white->best_move(board, vtm);
+                const int vscore = searcher_white->last_score();
                 tt.clear();
 
                 if (std::abs(vscore) > cfg.verify_limit)
@@ -279,7 +281,7 @@ namespace Datagen {
             int     draw_plies = 0;
             Outcome outcome    = Outcome::Invalid;
 
-            for (int ply = 0; ply < cfg.max_game_ply && sp < STATE_POOL_SIZE - 2; ++ply)
+            for (int ply = 0; sp < STATE_POOL_SIZE - 2; ++ply)
             {
                 if (board.rule50_count() >= 100 || board.is_draw(ply))
                 {
@@ -305,8 +307,10 @@ namespace Datagen {
                 tm.init(sl, board.side_to_move(), 0);
                 tm.start_clock();
 
-                Move best  = searcher->best_move(board, tm);
-                int  score = searcher->last_score();
+                Search *cur
+                    = (board.side_to_move() == WHITE) ? searcher_white.get() : searcher_black.get();
+                Move best  = cur->best_move(board, tm);
+                int  score = cur->last_score();
 
                 if (best == MOVE_NONE)
                     break;
@@ -366,7 +370,7 @@ namespace Datagen {
             }
 
             if (outcome == Outcome::Invalid)
-                outcome = Outcome::Draw;
+                continue;
 
             rec.root.outcome = outcome;
 
