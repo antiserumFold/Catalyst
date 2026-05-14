@@ -77,8 +77,7 @@ namespace Datagen {
         int draw_adj_min_ply = 80;
         int draw_adj_plies   = 12;
 
-        int max_game_ply = 400;
-        int score_clamp  = 3000;
+        int score_clamp = 3000;
 
         bool dfrc = false;
     };
