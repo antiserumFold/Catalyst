@@ -221,10 +221,10 @@ Catalyst would not exist without the broader chess programming community. In no 
 
 ---
 
-[license-badge]: https://img.shields.io/badge/License-GPL_v3-brightgreen?style=plastic
-[release-badge]: https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?logo=github&style=plastic&label=Release&color=097BBC
-[commits-badge]: https://img.shields.io/github/commits-since/AnanyTanwar/Catalyst/latest?style=plastic&label=Commits+Since+Release&color=e8820c
-[build-badge]: https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml/badge.svg?style=plastic
+[license-badge]: https://img.shields.io/badge/License-GPL_v3-blue?style=for-the-badge
+[release-badge]: https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?style=for-the-badge&logo=github&label=release
+[commits-badge]: https://img.shields.io/github/commits-since/AnanyTanwar/Catalyst/latest?style=for-the-badge&logo=github&label=commits+since+release
+[build-badge]: https://img.shields.io/github/actions/workflow/status/AnanyTanwar/Catalyst/catalyst.yml?style=for-the-badge&logo=github&label=Catalyst+Build
 
 [license-link]: https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE
 [release-link]: https://github.com/AnanyTanwar/Catalyst/releases/latest
