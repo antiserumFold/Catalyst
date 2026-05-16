@@ -102,7 +102,8 @@ bool Search::is_valid_tt_move(const Board &board, Move m) const
 // ---------------------------------------------------------------------------
 int Search::quiet_hist_score(const Board &board, Color us, Move m, PieceType movedPt, int ply) const
 {
-    int s = history_[us][from_sq(m)][to_sq(m)];
+    int s
+        = history_[us][from_sq(m)][to_sq(m)][threat_index(from_sq(m), to_sq(m), ss(ply)->threats)];
     s += pawnHistory_[pawn_history_index(board.pawn_key())][movedPt][to_sq(m)];
     const SearchStack *cur = ss(ply);
     if ((cur - 1)->contHistEntry)
@@ -114,9 +115,14 @@ int Search::quiet_hist_score(const Board &board, Color us, Move m, PieceType mov
     return s;
 }
 
-int Search::capture_hist_score(Color us, Move m, PieceType movedPt, PieceType capturedPt) const
+int Search::capture_hist_score(Color us,
+    Move                             m,
+    PieceType                        movedPt,
+    PieceType                        capturedPt,
+    Bitboard                         threats) const
 {
-    return captureHistory_[us][movedPt][to_sq(m)][capturedPt];
+    return captureHistory_[us][movedPt][to_sq(m)][capturedPt]
+                          [threat_index(from_sq(m), to_sq(m), threats)];
 }
 
 void Search::update_killers(Move m, int ply)
@@ -140,7 +146,8 @@ void Search::update_quiet_histories(const Board &board,
     int                                          histDepth,
     int                                          ply,
     Move                                        *tried,
-    int                                          triedCount)
+    int                                          triedCount,
+    Bitboard                                     threats)
 {
     int                  bonus = stat_bonus(histDepth);
     int                  malus = -stat_malus(histDepth);
@@ -150,7 +157,10 @@ void Search::update_quiet_histories(const Board &board,
     ContinuationHistory *ch2   = (cur - 2)->contHistEntry;
     ContinuationHistory *ch4   = (cur - 4)->contHistEntry;
 
-    gravity(history_[us][from_sq(bestMove)][to_sq(bestMove)], bonus, HISTORY_MAX);
+    gravity(history_[us][from_sq(bestMove)][to_sq(bestMove)]
+                    [threat_index(from_sq(bestMove), to_sq(bestMove), threats)],
+        bonus,
+        HISTORY_MAX);
     gravity(pawnHistory_[phIdx][bestPt][to_sq(bestMove)], bonus, HISTORY_MAX);
     if (ch1)
         gravity((*ch1)[bestPt][to_sq(bestMove)], bonus, HISTORY_MAX);
@@ -164,7 +174,10 @@ void Search::update_quiet_histories(const Board &board,
         if (tried[i] == bestMove)
             continue;
         PieceType qpt = piece_type(board.piece_on(from_sq(tried[i])));
-        gravity(history_[us][from_sq(tried[i])][to_sq(tried[i])], malus, HISTORY_MAX);
+        gravity(history_[us][from_sq(tried[i])][to_sq(tried[i])]
+                        [threat_index(from_sq(tried[i]), to_sq(tried[i]), threats)],
+            malus,
+            HISTORY_MAX);
         gravity(pawnHistory_[phIdx][qpt][to_sq(tried[i])], malus, HISTORY_MAX);
         if (ch1)
             gravity((*ch1)[qpt][to_sq(tried[i])], malus, HISTORY_MAX);
@@ -184,17 +197,22 @@ void Search::update_capture_histories(const Board & /*board*/,
     Move      *tried,
     PieceType *triedPts,
     PieceType *triedCaptPts,
-    int        triedCount)
+    int        triedCount,
+    Bitboard   threats)
 {
     int bonus = stat_bonus(histDepth);
     int malus = -stat_malus(histDepth);
     if (bestMove != MOVE_NONE)
-        gravity(captureHistory_[us][bestPt][to_sq(bestMove)][bestCaptPt], bonus, HISTORY_MAX);
+        gravity(captureHistory_[us][bestPt][to_sq(bestMove)][bestCaptPt]
+                               [threat_index(from_sq(bestMove), to_sq(bestMove), threats)],
+            bonus,
+            HISTORY_MAX);
     for (int i = 0; i < triedCount; ++i)
     {
         if (tried[i] == bestMove)
             continue;
-        gravity(captureHistory_[us][triedPts[i]][to_sq(tried[i])][triedCaptPts[i]],
+        gravity(captureHistory_[us][triedPts[i]][to_sq(tried[i])][triedCaptPts[i]]
+                               [threat_index(from_sq(tried[i]), to_sq(tried[i]), threats)],
             malus,
             HISTORY_MAX);
     }
@@ -559,7 +577,7 @@ int Search::negamax(Board &board,
             std::cout.flush();
         }
     }
-    
+
     if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
         return 0;
     if (ply >= MAX_PLY - 1)
@@ -599,6 +617,28 @@ int Search::negamax(Board &board,
     const int priorReduction = (ply > 0) ? ss(ply - 1)->reduction : 0;
     cur->reduction           = 0;
 
+    // Compute opponent threat map
+    {
+        Color    opp = ~board.side_to_move();
+        Bitboard occ = board.pieces();
+        Bitboard t   = 0;
+        Bitboard b;
+        b = board.pieces(PAWN, opp);
+        while (b)
+            t |= pawn_attacks(opp, pop_lsb(b));
+        b = board.pieces(KNIGHT, opp);
+        while (b)
+            t |= knight_attacks(pop_lsb(b));
+        t |= king_attacks(board.king_square(opp));
+        b = board.pieces(BISHOP, opp) | board.pieces(QUEEN, opp);
+        while (b)
+            t |= bishop_attacks(pop_lsb(b), occ);
+        b = board.pieces(ROOK, opp) | board.pieces(QUEEN, opp);
+        while (b)
+            t |= rook_attacks(pop_lsb(b), occ);
+        cur->threats = t;
+    }
+
     // ── TT probe ──────────────────────────────────────────────────────────────
     bool     ttHit   = false;
     TTEntry *ttEntry = tt.probe(board.key(), ttHit);
@@ -634,7 +674,10 @@ int Search::negamax(Board &board,
                     int bonus = std::min(STAT_BONUS_MULT * depth + STAT_BONUS_BASE, STAT_BONUS_MAX);
                     Color     us   = board.side_to_move();
                     PieceType ttPt = piece_type(board.piece_on(from_sq(ttMove)));
-                    gravity(history_[us][from_sq(ttMove)][to_sq(ttMove)], bonus, HISTORY_MAX);
+                    gravity(history_[us][from_sq(ttMove)][to_sq(ttMove)]
+                                    [threat_index(from_sq(ttMove), to_sq(ttMove), cur->threats)],
+                        bonus,
+                        HISTORY_MAX);
                     int phIdx = pawn_history_index(board.pawn_key());
                     gravity(pawnHistory_[phIdx][ttPt][to_sq(ttMove)], bonus, HISTORY_MAX);
                     if ((cur - 1)->contHistEntry)
@@ -655,7 +698,10 @@ int Search::negamax(Board &board,
                     int malus = std::min(STAT_MALUS_MULT * depth + STAT_MALUS_BASE, STAT_MALUS_MAX);
                     Color     us   = board.side_to_move();
                     PieceType ttPt = piece_type(board.piece_on(from_sq(ttMove)));
-                    gravity(history_[us][from_sq(ttMove)][to_sq(ttMove)], -malus, HISTORY_MAX);
+                    gravity(history_[us][from_sq(ttMove)][to_sq(ttMove)]
+                                    [threat_index(from_sq(ttMove), to_sq(ttMove), cur->threats)],
+                        -malus,
+                        HISTORY_MAX);
                     int phIdx = pawn_history_index(board.pawn_key());
                     gravity(pawnHistory_[phIdx][ttPt][to_sq(ttMove)], -malus / 2, HISTORY_MAX);
                     if ((cur - 1)->contHistEntry)
@@ -704,7 +750,10 @@ int Search::negamax(Board &board,
             int   delta   = staticEval - (cur - 1)->staticEval;
             int   ehBonus = std::clamp(delta / 2, -512, 512);
             Color them    = ~board.side_to_move();
-            gravity(history_[them][from_sq((cur - 1)->move)][to_sq((cur - 1)->move)],
+            gravity(history_[them][from_sq((cur - 1)->move)][to_sq((cur - 1)->move)]
+                            [threat_index(from_sq((cur - 1)->move),
+                                to_sq((cur - 1)->move),
+                                (cur - 1)->threats)],
                 -ehBonus,
                 HISTORY_MAX);
         }
@@ -736,7 +785,6 @@ int Search::negamax(Board &board,
     {
         if (priorReduction >= 3 * LMR_FRAC && !opponentWorsening)
             ++depth;
-        // NEW: reduce depth if prior reduction was large and both evals sum high
         if (priorReduction >= 2 * LMR_FRAC && depth >= 2 && staticEval != SCORE_NONE
             && (cur - 1)->staticEval != SCORE_NONE && staticEval + (cur - 1)->staticEval > 173)
             --depth;
@@ -908,6 +956,7 @@ int Search::negamax(Board &board,
         ch1,
         ch2,
         ch4,
+        cur->threats,
         moveBufs_[std::min(ply, MAX_PLY - 1)]);
 
     if (!inCheck && depth <= HIST_PRUNE_DEPTH)
@@ -944,7 +993,7 @@ int Search::negamax(Board &board,
                         : NO_PIECE_TYPE;
 
         int histScore = isQuiet ? quiet_hist_score(board, us, m, movedPt, ply)
-                                : capture_hist_score(us, m, movedPt, captPt);
+                                : capture_hist_score(us, m, movedPt, captPt, cur->threats);
 
         if (isQuiet && quietCount < 64)
             quietsTried[quietCount++] = m;
@@ -1213,7 +1262,8 @@ int Search::negamax(Board &board,
                     histDepth,
                     ply,
                     quietsTried,
-                    quietCount);
+                    quietCount,
+                    cur->threats);
                 // All tried captures also failed — penalise them
                 // MOVE_NONE as bestMove means only the malus loop runs
                 if (capsCount > 0)
@@ -1226,7 +1276,8 @@ int Search::negamax(Board &board,
                         capsTried,
                         capsPts,
                         capsCaptPts,
-                        capsCount);
+                        capsCount,
+                        cur->threats);
             }
             else
             {
@@ -1239,7 +1290,8 @@ int Search::negamax(Board &board,
                     capsTried,
                     capsPts,
                     capsCaptPts,
-                    capsCount);
+                    capsCount,
+                    cur->threats);
             }
 
             if (ext < 2)
@@ -1262,7 +1314,10 @@ int Search::negamax(Board &board,
         Move  prev  = (cur - 1)->move;
         Color them  = ~us;
         int   bonus = stat_bonus(depth);
-        gravity(history_[them][from_sq(prev)][to_sq(prev)], bonus, HISTORY_MAX);
+        gravity(history_[them][from_sq(prev)][to_sq(prev)]
+                        [threat_index(from_sq(prev), to_sq(prev), (cur - 1)->threats)],
+            bonus,
+            HISTORY_MAX);
         int phIdx = pawn_history_index(board.pawn_key());
         gravity(pawnHistory_[phIdx][(cur - 1)->movedPt][to_sq(prev)], bonus / 2, HISTORY_MAX);
     }
