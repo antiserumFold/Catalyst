@@ -65,6 +65,7 @@ MovePicker::MovePicker(const Board &b,
     const ContinuationHistory      *ch1,
     const ContinuationHistory      *ch2,
     const ContinuationHistory      *ch4,
+    Bitboard                        thr,
     MoveBuffer                     &buf)
     : board(b)
     , stage(STAGE_TT)
@@ -89,6 +90,7 @@ MovePicker::MovePicker(const Board &b,
     , badCaptCur(0)
     , seeThreshold(SEE_CAPTURE_THRESHOLD)
     , qsearchMode(false)
+    , threats(thr)
 {
     if (ttMove != MOVE_NONE
         && (board.piece_on(from_sq(ttMove)) == NO_PIECE
@@ -321,7 +323,7 @@ void MovePicker::generate_and_score_quiets()
         int       sc = 0;
 
         if (history)
-            sc += (*history)[us][from_sq(m)][to];
+            sc += (*history)[us][from_sq(m)][to][threat_index(from_sq(m), to, oppThreats)];
 
         if (pawnHistory)
             sc += (*pawnHistory)[phIdx][pt][to];
@@ -331,8 +333,10 @@ void MovePicker::generate_and_score_quiets()
         {
             if (contHist1)
                 sc += 2 * (*contHist1)[pt][to];
+
             if (contHist2)
                 sc += (*contHist2)[pt][to];
+
             if (contHist4)
                 sc += (*contHist4)[pt][to] / 2;
         }
@@ -394,7 +398,7 @@ int MovePicker::score_capture(Move m) const
     int score = MVV_LVA[victim][attacker];
 
     if (captureHistory)
-        score += (*captureHistory)[us][attacker][to][victim] / 2;
+        score += (*captureHistory)[us][attacker][to][victim][threat_index(from, to, threats)] / 2;
 
     return score;
 }
