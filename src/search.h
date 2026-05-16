@@ -103,6 +103,7 @@ void       init_lmr();
 static_assert(LMR_FRAC == 1024, "LMR_FRAC should be 1024");
 
 struct SearchStack {
+    Bitboard             threats          = 0;
     Move                *pv               = nullptr;
     Move                 move             = MOVE_NONE;
     PieceType            movedPt          = NO_PIECE_TYPE;
@@ -241,7 +242,8 @@ private:
     [[nodiscard]] int capture_hist_score(Color us,
         Move                                   m,
         PieceType                              movedPt,
-        PieceType                              capturedPt) const;
+        PieceType                              capturedPt,
+        Bitboard                               threats) const;
     void              update_killers(Move m, int ply);
     void              update_counter(Color us, Move prevMove, Move reply);
     void              update_quiet_histories(const Board &board,
@@ -251,7 +253,8 @@ private:
         int                                  histDepth,
         int                                  ply,
         Move                                *tried,
-        int                                  triedCount);
+        int                                  triedCount,
+        Bitboard                             threats);
     void              update_capture_histories(const Board &board,
         Color                                  us,
         Move                                   bestMove,
@@ -261,7 +264,8 @@ private:
         Move                                  *tried,
         PieceType                             *triedPts,
         PieceType                             *triedCaptPts,
-        int                                    triedCount);
+        int                                    triedCount,
+        Bitboard                               threats);
 
     ContinuationHistory *cont_hist(Color us, PieceType pt, Square to)
     {
