@@ -4,10 +4,10 @@
 
 Catalyst uses a `(768 → 256)×2 → 8` neural network with incremental accumulator updates and SIMD-accelerated inference (SSE4.1 / AVX2 / AVX-512), combined with a robust search implementation including PVS, Lazy SMP, and an extensive suite of pruning, extension, and reduction techniques.
 
-[![License][license-badge]][license-link]
-[![Release][release-badge]][release-link]
-[![Commits][commits-badge]][commits-link]
-[![Build][build-badge]][build-link]
+[![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-blue.svg)](https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE)
+[![Catalyst Build](https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml/badge.svg)](https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml)
+[![Release](https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?logo=github&color=32CD32)](https://github.com/AnanyTanwar/Catalyst/releases/latest)
+[![Commits Since Release](https://img.shields.io/github/commits-since/AnanyTanwar/Catalyst/latest?logo=github&color=FF8C00)](https://github.com/AnanyTanwar/Catalyst/commits/main)
 
 ---
 
@@ -220,13 +220,3 @@ Catalyst would not exist without the broader chess programming community. In no 
 - [bullet](https://github.com/jw1912/bullet) — NNUE trainer
 
 ---
-
-[license-badge]: https://img.shields.io/badge/License-GPL_v3-blue?style=for-the-badge
-[release-badge]: https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?style=for-the-badge&logo=github&label=release
-[commits-badge]: https://img.shields.io/github/commits-since/AnanyTanwar/Catalyst/latest?style=for-the-badge&logo=github&label=commits+since+release
-[build-badge]: https://img.shields.io/github/actions/workflow/status/AnanyTanwar/Catalyst/catalyst.yml?style=for-the-badge&logo=github&label=Catalyst+Build
-
-[license-link]: https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE
-[release-link]: https://github.com/AnanyTanwar/Catalyst/releases/latest
-[commits-link]: https://github.com/AnanyTanwar/Catalyst/commits/main
-[build-link]: https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml
