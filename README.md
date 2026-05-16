@@ -36,10 +36,12 @@ Official CCRL ratings for each release are listed below.
   - Null move pruning with verification
   - Razoring
   - Futility pruning
+  - Capture futility pruning
   - Late move pruning (LMP)
   - SEE pruning (quiets and noisy moves)
   - History pruning
   - ProbCut
+  - Small ProbCut (early TT-based return when fail-high margin is large)
 - **Extensions**
   - Singular extensions
   - Double and triple extensions
@@ -48,12 +50,14 @@ Official CCRL ratings for each release are listed below.
 - **Reductions**
   - Late move reductions (LMR) with history-based adjustments
   - Internal iterative reduction (IIR)
+  - Alpha-raise depth reduction
 - **Move Ordering**
   - TT move
   - Staged move picker (good captures → killers → countermove → quiets → bad captures)
   - MVV-LVA for captures
   - Threat-based quiet move scoring with precomputed opponent attack maps
-  - Continuation history–weighted quiet move ordering (1-ply > 2-ply > 4-ply)
+  - Threat escape bonus/malus for quiet moves (queen, rook, minor pieces)
+  - Continuation history–weighted quiet move ordering (1-ply × 2 > 2-ply > 4-ply)
   - Dynamic SEE thresholds for capture classification based on move score
   - Bad captures ordered by SEE loss (least-losing first)
   - Killer move heuristic (2 per ply)
@@ -63,16 +67,22 @@ Official CCRL ratings for each release are listed below.
   - Pawn history
   - 1-ply, 2-ply, and 4-ply continuation history
 - **History**
-  - Butterfly history
-  - Capture history
+  - Butterfly history (threat-indexed)
+  - Capture history (threat-indexed)
   - Pawn history
   - Continuation history (1-ply, 2-ply, 4-ply)
   - Correction history (main, pawn, non-pawn white, non-pawn black, continuation)
-- Mate distance pruning
-- Fifty-move rule eval scaling
-- Draw score randomization (anti-repetition)
-- Hindsight depth adjustment
-- Lazy SMP (multi-threaded search)
+  - Eval history (applies malus to opponent's quiet move when our eval improves)
+- **Miscellaneous**
+  - Mate distance pruning
+  - Hindsight depth adjustment
+  - Shuffling detection in singular extension
+  - ttPv propagation on fail-low
+  - TT move bonus/malus on cutoff and fail-low
+  - Fifty-move rule eval scaling
+  - Draw score randomization (anti-repetition)
+  - Stalemate avoidance at root
+  - Lazy SMP (multi-threaded search)
 
 ### Evaluation
 - **NNUE**
@@ -157,11 +167,23 @@ make release-linux
 # Build all Windows release binaries (requires MinGW cross-compiler)
 make release-win
 
-# Build with PGO (profile-guided optimisation)
+# Build with PGO (profile-guided optimisation) for your native CPU
 make pgo
+
+# Build with PGO for a specific architecture
+make pgo ARCH=bmi2
+make pgo ARCH=avx512
+make pgo ARCH=avx2
+
+# Build with debug symbols and sanitizers (optional)
+make debug
+make debug SANITIZE=-fsanitize=address,undefined
 
 # Clean build artifacts
 make clean
+
+# Clean build artifacts and downloaded NNUE file
+make distclean
 ```
 
 All binaries are placed in `bin/`.
@@ -189,9 +211,9 @@ Catalyst is free software distributed under the [GNU General Public License v3.0
 Catalyst would not exist without the broader chess programming community. In no particular order, these engines and projects were notable sources of ideas and inspiration:
 
 - [Stockfish](https://github.com/official-stockfish/Stockfish)
-- [Stormphrax](https://github.com/Ciekce/Stormphrax) 
+- [Stormphrax](https://github.com/Ciekce/Stormphrax)
 - [Alexandria](https://github.com/PGG106/Alexandria)
--  [Tarnished](https://github.com/Bobingstern/Tarnished/)
+- [Tarnished](https://github.com/Bobingstern/Tarnished/)
 - [Integral](https://github.com/aronpetko/integral)
 - [Obsidian](https://github.com/gab8192/Obsidian)
 - [bullet](https://github.com/jw1912/bullet) — NNUE trainer
