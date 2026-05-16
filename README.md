@@ -12,17 +12,15 @@ Catalyst uses a `(768 → 256)×2 → 8` neural network with incremental accumul
 
 ## Strength
 
-Catalyst has not yet been rated by CCRL. The following ratings are based on internal testing and should be considered approximate.
+Official CCRL ratings for each release are listed below.
 
-| Version | Estimated Elo | Notes |
-|:--------|:-------------:|:------|
-| v1.0.0  | ~2900         | Initial NNUE implementation |
-| v2.0.0  | ~3058         | +158 Elo vs v1 — new NNUE architecture, major search improvements |
-| v2.1.0  | ~3130         | +72 Elo vs v2.0 — TT rewrite: 16-byte entries, `uint128` index, huge page support |
-| v2.2.0  | ~3170         | +40 Elo vs v2.1 — threat-based move scoring, dynamic SEE thresholds |
-
-> Ratings are approximate and based on self-play at 10+0.1. They may vary depending on hardware, time control, and testing methodology.  
-> Official CCRL ratings will be added once Catalyst is submitted.
+| Version | CCRL 40/15 | CCRL 2+1 |
+|:--------|:----------:|:--------:|
+| v1.0.0  | -          | -        |
+| v2.0.0  | -          | -        |
+| v2.1.0  | -          | -        |
+| v2.2.0  | -          | -        |
+| v3.0.0  | -          | -        |
 
 ---
 
