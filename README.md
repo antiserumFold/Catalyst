@@ -139,6 +139,7 @@ Choose the binary that matches your CPU's highest supported instruction set:
 | `avx512` | AVX-512 + BMI2 (Ice Lake, Rocket Lake+) | |
 | `bmi2` | AVX2 + BMI2 (Intel Haswell+, AMD Zen 3+) | Recommended for Intel Haswell+ and AMD Zen 3+ |
 | `avx2` | AVX2 (Broadwell+, AMD Excavator+) | Use for AMD Zen 1/2 or older Intel |
+| `sse41` | SSE4.1 (Core 2 Penryn+, Phenom II+) | Fallback for pre-AVX2 CPUs |
 | `x86-64` | x86-64 + POPCNT | Widest compatibility, slowest |
 
 > **AMD Zen 1 / Zen 2 users**: use the `avx2` build even if your CPU supports BMI2. These CPUs implement `pext`/`pdep` in microcode, making them very slow for Catalyst's purposes.
@@ -154,13 +155,16 @@ Requires `make`, a C++20 compiler (GCC ≥ 13 or Clang ≥ 16), and `objcopy`. T
 git clone https://github.com/AnanyTanwar/Catalyst
 cd Catalyst
 
-# Build for your native CPU (recommended for local use)
-make ARCH=native
+# Build optimised for the host CPU (recommended for local use)
+make native
 
 # Build a specific architecture
+make linux-x86-64
+make linux-sse41
 make linux-avx2
 make linux-bmi2
 make linux-avx512
+make linux-avx512vnni
 
 # Build all Linux release binaries
 make release-linux
@@ -168,16 +172,20 @@ make release-linux
 # Build all Windows release binaries (requires MinGW cross-compiler)
 make release-win
 
-# Build with PGO (profile-guided optimisation) for your native CPU
-make pgo
-
-# Build with PGO for a specific architecture
-make pgo ARCH=bmi2
-make pgo ARCH=avx512
+# Build with PGO (profile-guided optimisation)
+make pgo                  # native CPU
 make pgo ARCH=avx2
+make pgo ARCH=bmi2
+make pgo ARCH=sse41
+make pgo ARCH=avx512
 
-# Build with debug symbols and sanitizers (Optional)
+# Install to system
+make install              # installs to /usr/local/bin
+make install PREFIX=/usr  # custom prefix
+
+# Debug build
 make debug
+make sanitize             # debug + ASan + UBSan
 make debug SANITIZE=-fsanitize=address,undefined
 
 # Clean build artifacts
@@ -218,5 +226,3 @@ Catalyst would not exist without the broader chess programming community. In no 
 - [Integral](https://github.com/aronpetko/integral)
 - [Obsidian](https://github.com/gab8192/Obsidian)
 - [bullet](https://github.com/jw1912/bullet) — NNUE trainer
-
----
