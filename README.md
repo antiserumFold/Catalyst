@@ -58,7 +58,7 @@ Official CCRL ratings for each release are listed below.
   - MVV-LVA for captures
   - Threat-based quiet move scoring with precomputed opponent attack maps
   - Threat escape bonus/malus for quiet moves (queen, rook, minor pieces)
-  - Continuation history–weighted quiet move ordering (1-ply × 2 > 2-ply > 4-ply)
+  - Continuation history–weighted quiet move ordering (1-ply × 2 > 2-ply > 3-ply > 4-ply)
   - Dynamic SEE thresholds for capture classification based on move score
   - Bad captures ordered by SEE loss (least-losing first)
   - Killer move heuristic (2 per ply)
@@ -66,12 +66,12 @@ Official CCRL ratings for each release are listed below.
   - Butterfly history
   - Capture history
   - Pawn history
-  - 1-ply, 2-ply, and 4-ply continuation history
+  - 1-ply, 2-ply, 3-ply, and 4-ply continuation history
 - **History**
   - Butterfly history (threat-indexed)
   - Capture history (threat-indexed)
   - Pawn history
-  - Continuation history (1-ply, 2-ply, 4-ply)
+  - Continuation history (1-ply, 2-ply, 3-ply, 4-ply)
   - Correction history (main, pawn, non-pawn white, non-pawn black, continuation)
   - Eval history (applies malus to opponent's quiet move when our eval improves)
 - **Miscellaneous**
