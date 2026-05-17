@@ -114,8 +114,10 @@ int Search::quiet_hist_score(const Board &board, Color us, Move m, PieceType mov
         s += (*(cur - 1)->contHistEntry)[movedPt][to_sq(m)];
     if ((cur - 2)->contHistEntry)
         s += (*(cur - 2)->contHistEntry)[movedPt][to_sq(m)];
+    if ((cur - 3)->contHistEntry)
+        s += (*(cur - 3)->contHistEntry)[movedPt][to_sq(m)] / 2;
     if ((cur - 4)->contHistEntry)
-        s += (*(cur - 4)->contHistEntry)[movedPt][to_sq(m)] / 2;
+        s += (*(cur - 4)->contHistEntry)[movedPt][to_sq(m)] / 4;
     return s;
 }
 
@@ -151,7 +153,8 @@ void Search::update_quiet_histories(const Board &board,
     int                                          ply,
     Move                                        *tried,
     int                                          triedCount,
-    Bitboard                                     threats)
+    Bitboard                                     threats,
+    bool                                         improving)
 {
     int                  bonus = stat_bonus(histDepth);
     int                  malus = -stat_malus(histDepth);
@@ -159,17 +162,20 @@ void Search::update_quiet_histories(const Board &board,
     SearchStack         *cur   = ss(ply);
     ContinuationHistory *ch1   = (cur - 1)->contHistEntry;
     ContinuationHistory *ch2   = (cur - 2)->contHistEntry;
+    ContinuationHistory *ch3   = (cur - 3)->contHistEntry;
     ContinuationHistory *ch4   = (cur - 4)->contHistEntry;
+
+    int scaledBonus = improving ? bonus * 5 / 4 : bonus;
 
     gravity(history_[us][from_sq(bestMove)][to_sq(bestMove)]
                     [threat_index(from_sq(bestMove), to_sq(bestMove), threats)],
-        bonus,
+        scaledBonus,
         HISTORY_MAX);
     gravity(pieceToHistory_[us][bestPt][to_sq(bestMove)]
                            [threat_index(from_sq(bestMove), to_sq(bestMove), threats)],
-        bonus,
+        scaledBonus,
         HISTORY_MAX);
-    gravity(pawnHistory_[phIdx][bestPt][to_sq(bestMove)], bonus, HISTORY_MAX);
+    gravity(pawnHistory_[phIdx][bestPt][to_sq(bestMove)], scaledBonus, HISTORY_MAX);
 
     // Compute base for weighted conthist update
     int bestMainHist
@@ -183,17 +189,24 @@ void Search::update_quiet_histories(const Board &board,
         bestContHist += (*ch1)[bestPt][to_sq(bestMove)];
     if (ch2)
         bestContHist += (*ch2)[bestPt][to_sq(bestMove)];
+    if (ch3)
+        bestContHist += (*ch3)[bestPt][to_sq(bestMove)] / 2;
     if (ch4)
-        bestContHist += (*ch4)[bestPt][to_sq(bestMove)] / 2;
+        bestContHist += (*ch4)[bestPt][to_sq(bestMove)] / 4;
     int bestBase = bestContHist + bestMainHist / 2;
 
     if (ch1)
-        (*ch1)[bestPt][to_sq(bestMove)] += bonus - bestBase * std::abs(bonus) / HISTORY_MAX;
+        (*ch1)[bestPt][to_sq(bestMove)]
+            += scaledBonus - bestBase * std::abs(scaledBonus) / HISTORY_MAX;
     if (ch2)
-        (*ch2)[bestPt][to_sq(bestMove)] += bonus - bestBase * std::abs(bonus) / HISTORY_MAX;
+        (*ch2)[bestPt][to_sq(bestMove)]
+            += scaledBonus - bestBase * std::abs(scaledBonus) / HISTORY_MAX;
+    if (ch3)
+        (*ch3)[bestPt][to_sq(bestMove)]
+            += (scaledBonus / 2) - bestBase * std::abs(scaledBonus / 2) / HISTORY_MAX;
     if (ch4)
         (*ch4)[bestPt][to_sq(bestMove)]
-            += (bonus / 2) - bestBase * std::abs(bonus / 2) / HISTORY_MAX;
+            += (scaledBonus / 4) - bestBase * std::abs(scaledBonus / 4) / HISTORY_MAX;
 
     for (int i = 0; i < triedCount; ++i)
     {
@@ -214,17 +227,22 @@ void Search::update_quiet_histories(const Board &board,
             triedContHist += (*ch1)[qpt][to_sq(tried[i])];
         if (ch2)
             triedContHist += (*ch2)[qpt][to_sq(tried[i])];
+        if (ch3)
+            triedContHist += (*ch3)[qpt][to_sq(tried[i])] / 2;
         if (ch4)
-            triedContHist += (*ch4)[qpt][to_sq(tried[i])] / 2;
+            triedContHist += (*ch4)[qpt][to_sq(tried[i])] / 4;
         int triedBase = triedContHist + triedMainHist / 2;
 
         if (ch1)
             (*ch1)[qpt][to_sq(tried[i])] += malus - triedBase * std::abs(malus) / HISTORY_MAX;
         if (ch2)
             (*ch2)[qpt][to_sq(tried[i])] += malus - triedBase * std::abs(malus) / HISTORY_MAX;
+        if (ch3)
+            (*ch3)[qpt][to_sq(tried[i])]
+                += (malus / 2) - triedBase * std::abs(malus / 2) / HISTORY_MAX;
         if (ch4)
             (*ch4)[qpt][to_sq(tried[i])]
-                += (malus / 2) - triedBase * std::abs(malus / 2) / HISTORY_MAX;
+                += (malus / 4) - triedBase * std::abs(malus / 4) / HISTORY_MAX;
     }
 }
 
@@ -997,6 +1015,7 @@ int Search::negamax(Board &board,
 
     ContinuationHistory *ch1 = (cur - 1)->contHistEntry;
     ContinuationHistory *ch2 = (cur - 2)->contHistEntry;
+    ContinuationHistory *ch3 = (cur - 3)->contHistEntry;
     ContinuationHistory *ch4 = (cur - 4)->contHistEntry;
 
     // Each ply gets its own dedicated buffer slot
@@ -1011,6 +1030,7 @@ int Search::negamax(Board &board,
         pawnHistory_,
         ch1,
         ch2,
+        ch3,
         ch4,
         cur->threats,
         moveBufs_[std::min(ply, MAX_PLY - 1)]);
@@ -1319,7 +1339,8 @@ int Search::negamax(Board &board,
                     ply,
                     quietsTried,
                     quietCount,
-                    cur->threats);
+                    cur->threats,
+                    improving);
                 // All tried captures also failed — penalise them
                 // MOVE_NONE as bestMove means only the malus loop runs
                 if (capsCount > 0)
