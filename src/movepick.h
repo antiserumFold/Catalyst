@@ -48,7 +48,7 @@ inline constexpr int QUIET_PRUNE_DISABLED = -32000000;
 // Butterfly history
 using ButterflyHistory = int[COLOR_NB][SQUARE_NB][SQUARE_NB][4];
 
-// PieceTo history 
+// PieceTo history
 using PieceToHistory = int[COLOR_NB][PIECE_TYPE_NB][SQUARE_NB][4];
 
 // Capture history
@@ -94,6 +94,7 @@ public:
         const PawnHistory         &pawnHist,
         const ContinuationHistory *contHist1,
         const ContinuationHistory *contHist2,
+        const ContinuationHistory *contHist3,
         const ContinuationHistory *contHist4,
         Bitboard                   threats,
         MoveBuffer                &buf);
@@ -125,6 +126,7 @@ public:
     const PawnHistory         *pawnHistory;
     const ContinuationHistory *contHist1;
     const ContinuationHistory *contHist2;
+    const ContinuationHistory *contHist3;
     const ContinuationHistory *contHist4;
 
     Move *moves;
