@@ -1,15 +1,35 @@
-# Catalyst
+<p align="center">
+  <img src="assets/logo.png" width="180">
+</p>
 
-> A UCI-compliant chess engine written in C++20, featuring NNUE evaluation and advanced search.
+<h1 align="center">Catalyst</h1>
 
-[![build](https://img.shields.io/github/actions/workflow/status/AnanyTanwar/Catalyst/catalyst.yml?style=flat-square&logo=github)](https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml)
-[![release](https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?style=flat-square&logo=github&color=3b82f6)](https://github.com/AnanyTanwar/Catalyst/releases/latest)
-[![license](https://img.shields.io/badge/license-GPLv3-2563eb?style=flat-square)](https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE)
-[![commits](https://img.shields.io/github/commits-since/AnanyTanwar/Catalyst/latest?style=flat-square&logo=git&color=f59e0b)](https://github.com/AnanyTanwar/Catalyst/commits/main)
+<p align="center">
+  A UCI-compliant chess engine written in C++20,<br>
+  featuring NNUE evaluation and advanced search.
+</p>
 
-Catalyst uses a `(768 → 256)×2 → 8` neural network with incremental accumulator updates and SIMD-accelerated inference (SSE4.1 / AVX2 / AVX-512), combined with a robust search implementation including PVS, Lazy SMP, and an extensive suite of pruning, extension, and reduction techniques.
+<p align="center">
+  <a href="https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/AnanyTanwar/Catalyst/catalyst.yml?style=flat-square&logo=github" />
+  </a>
+  
+  <a href="https://github.com/AnanyTanwar/Catalyst/releases/latest">
+    <img src="https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?style=flat-square&logo=github&color=3b82f6" />
+  </a>
+
+  <a href="https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-GPLv3-2563eb?style=flat-square" />
+  </a>
+
+  <a href="https://github.com/AnanyTanwar/Catalyst/commits/main">
+    <img src="https://img.shields.io/github/commits-since/AnanyTanwar/Catalyst/latest?style=flat-square&logo=git&color=f59e0b" />
+  </a>
+</p>
 
 ---
+
+Catalyst uses a `(768 → 256)×2 → 8` neural network with incremental accumulator updates and SIMD-accelerated inference (SSE4.1 / AVX2 / AVX-512), combined with a robust search implementation including PVS, Lazy SMP, and an extensive suite of pruning, extension, and reduction techniques.
 
 ## Strength
 
