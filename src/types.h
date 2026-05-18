@@ -46,13 +46,15 @@ inline constexpr int MAX_PLY   = 128;
 inline constexpr int MAX_MOVES = 512;
 inline constexpr int MAX_DEPTH = 64;
 
-// Score Constants
-inline constexpr Score SCORE_DRAW               = 0;
-inline constexpr Score SCORE_MATE               = 32000;
-inline constexpr Score SCORE_INFINITE           = 32001;
-inline constexpr Score SCORE_NONE               = 32002;
-inline constexpr Score SCORE_MATE_IN_MAX_PLY    = SCORE_MATE - MAX_PLY;
-inline constexpr Score SCORE_TB_WIN             = SCORE_MATE_IN_MAX_PLY - 1;
+// Score hierarchy (high to low): INFINITE > NONE > MATE > TB_WIN > MATE_IN_MAX_PLY > normal scores
+// Scores beyond SCORE_MATE_IN_MAX_PLY are treated as forced mate or TB win/loss
+inline constexpr Score SCORE_DRAW            = 0;
+inline constexpr Score SCORE_MATE            = 32000;
+inline constexpr Score SCORE_INFINITE        = 32001;
+inline constexpr Score SCORE_NONE            = 32002;
+inline constexpr Score SCORE_MATE_IN_MAX_PLY = SCORE_MATE - MAX_PLY;
+inline constexpr Score SCORE_TB_WIN
+    = SCORE_MATE_IN_MAX_PLY - 1;  // TB wins ranked below forced mates
 inline constexpr Score SCORE_TB_WIN_IN_MAX_PLY  = SCORE_TB_WIN - MAX_PLY;
 inline constexpr Score SCORE_TB_LOSS_IN_MAX_PLY = -SCORE_TB_WIN_IN_MAX_PLY;
 
@@ -171,6 +173,7 @@ enum Piece : uint8_t {
     return Color(pc >> 3);
 }
 
+// Approximate piece values used for SEE and MVV-LVA move ordering, not NNUE evaluation
 inline constexpr int PIECE_VALUE[PIECE_TYPE_NB] = { 0, 100, 320, 330, 500, 900, 0, 0 };
 
 struct CastlingData {
@@ -178,6 +181,8 @@ struct CastlingData {
 };
 
 // clang-format off
+// Indexed by CastlingRights bitmask — only power-of-two indices (1,2,4,8) are valid castling rights
+// Composite rights (e.g. WHITE_CASTLING=3) are never used as direct lookup keys here
 inline constexpr CastlingData CASTLING_DATA[CASTLING_RIGHTS_NB] = {
     {SQ_NONE, SQ_NONE, SQ_NONE, SQ_NONE}, // 0: NO_CASTLING
     {SQ_E1, SQ_G1, SQ_H1, SQ_F1},         // 1: WHITE_OO
@@ -284,6 +289,7 @@ inline constexpr Bitboard DarkSquares  = 0xAA55AA55AA55AA55ULL;
     return b & (b - 1);
 }
 
+// Two squares are on opposite colors if (file ^ rank) parity differs between them
 [[nodiscard]] FORCE_INLINE constexpr bool opposite_colors(Square s1, Square s2)
 {
     return ((int(fileOf(s1)) ^ int(rankOf(s1)) ^ int(fileOf(s2)) ^ int(rankOf(s2))) & 1);
@@ -303,6 +309,7 @@ inline constexpr Bitboard DarkSquares  = 0xAA55AA55AA55AA55ULL;
 }
 
 // clang-format off
+// Operator overload macros for strongly-typed enums — avoids verbose static_cast everywhere
 #define ENABLE_BASE_OPERATORS_ON(T)                                        \
   [[nodiscard]] constexpr T operator+(T d1, int d2) { return T(int(d1) + d2); } \
   [[nodiscard]] constexpr T operator-(T d1, int d2) { return T(int(d1) - d2); } \
