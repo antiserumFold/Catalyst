@@ -230,7 +230,7 @@ distclean: clean
 
 help:
 	@echo ""
-	@echo "Catalyst Chess Engine v$(VERSION)"
+	@echo "Catalyst v$(VERSION)"
 	@echo ""
 	@echo "Usage:  make [target] [ARCH=arch] [CXX=compiler]"
 	@echo ""
