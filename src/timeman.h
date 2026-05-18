@@ -25,6 +25,7 @@
 
 namespace Catalyst {
 
+// Parameters passed from UCI to control search termination conditions
 struct SearchLimits {
     int depth     = 64;
     int movetime  = 0;
@@ -88,6 +89,8 @@ private:
     static constexpr double MIN_SCALE     = 0.5;
     static constexpr double MAX_SCALE     = 2.5;
 
+    // Scale factor indexed by number of stable iterations (0=unstable, 5=very stable)
+    // Unstable best move = use more time, stable best move = use less time
     static constexpr double STABILITY_SCALE[6] = {
         2.50,
         1.20,
@@ -97,11 +100,13 @@ private:
         0.70,
     };
 
+    // Use more time when eval is volatile between iterations
     static constexpr int    SCORE_INSTAB_THRESH_HIGH = 30;
     static constexpr int    SCORE_INSTAB_THRESH_LOW  = 15;
     static constexpr double SCORE_INSTAB_SCALE_HIGH  = 1.25;
     static constexpr double SCORE_INSTAB_SCALE_LOW   = 1.12;
 
+    // Complexity estimate: positions with large eval swings from depth 1 get more time
     static constexpr double NODE_FRAC_THRESHOLD = 0.50;
     static constexpr double NODE_FRAC_SCALE_UP  = 1.20;
     static constexpr double NODE_FRAC_SCALE_DN  = 0.85;
