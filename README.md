@@ -2,10 +2,10 @@
 
 > A UCI-compliant chess engine written in C++20, featuring NNUE evaluation and advanced search.
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-blue.svg)](https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE)
-[![Catalyst Build](https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml/badge.svg)](https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml)
-[![release](https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?logo=github&color=32CD32)](https://github.com/AnanyTanwar/Catalyst/releases/latest)
-[![commits since release](https://img.shields.io/github/commits-since/AnanyTanwar/Catalyst/latest?logo=github&color=FF8C00)](https://github.com/AnanyTanwar/Catalyst/commits/main)
+[![build](https://img.shields.io/github/actions/workflow/status/AnanyTanwar/Catalyst/catalyst.yml?style=flat-square&logo=github)](https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml)
+[![release](https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?style=flat-square&logo=github&color=3b82f6)](https://github.com/AnanyTanwar/Catalyst/releases/latest)
+[![license](https://img.shields.io/badge/license-GPLv3-2563eb?style=flat-square)](https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE)
+[![commits](https://img.shields.io/github/commits-since/AnanyTanwar/Catalyst/latest?style=flat-square&logo=git&color=f59e0b)](https://github.com/AnanyTanwar/Catalyst/commits/main)
 
 Catalyst uses a `(768 → 256)×2 → 8` neural network with incremental accumulator updates and SIMD-accelerated inference (SSE4.1 / AVX2 / AVX-512), combined with a robust search implementation including PVS, Lazy SMP, and an extensive suite of pruning, extension, and reduction techniques.
 
