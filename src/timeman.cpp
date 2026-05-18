@@ -22,6 +22,7 @@
 
 namespace Catalyst {
 
+// Estimates remaining moves in the game for time allocation when movestogo is not provided
 static int compute_moves_to_go(int remaining, int movestogo)
 {
     if (movestogo > 0)
@@ -35,6 +36,7 @@ static int compute_moves_to_go(int remaining, int movestogo)
     return 20;
 }
 
+// Computes soft (optimal) and hard (max) time limits from remaining clock time
 static void compute_limits(int remaining,
     int                        inc,
     int                        movestogo,
@@ -219,6 +221,7 @@ bool TimeManager::time_up(uint64_t nodes) const
     if (maxMs <= 0)
         return false;
 
+    // Only check elapsed time every 1024 nodes to avoid expensive syscalls
     if ((nodes & 1023) != 0)
         return false;
 
