@@ -248,6 +248,8 @@ void MovePicker::generate_and_score_captures()
     int goodCount = 0;
     for (int i = 0; i < captEnd; ++i)
     {
+        // Dynamic SEE threshold based on capture score — high-scoring captures get more lenient
+        // threshold
         int dynThresh
             = is_promotion(moves[i]) ? -10000 : std::clamp(-scores[i] / 32 + 236, -500, 500);
         if (is_promotion(moves[i]) || see_ge(moves[i], dynThresh))
@@ -334,6 +336,7 @@ void MovePicker::generate_and_score_quiets()
         // Continuation history: 1-ply has the highest signal
         if (pt >= PAWN && pt <= KING)
         {
+            // 1-ply continuation history has the strongest signal, weight decreases with distance
             if (contHist1)
                 sc += 2 * (*contHist1)[pt][to];
             if (contHist2)
@@ -425,6 +428,8 @@ void MovePicker::select_best(int begin, int end)
     }
 }
 
+// Static exchange evaluation — returns true if the sequence of captures on a square
+// results in a gain >= threshold after all forced recaptures are resolved
 bool MovePicker::see_ge(Move m, int threshold) const
 {
     if (is_en_passant(m))
