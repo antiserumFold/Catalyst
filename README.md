@@ -20,8 +20,10 @@
 
   <a href="https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-GPL--3.0-2563eb?style=for-the-badge">
-  </a>
+</a>
 </p>
+
+<br>
 
 ---
 
