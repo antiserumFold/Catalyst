@@ -21,11 +21,12 @@
 
 namespace Catalyst {
 
-// SEE thresholds
-inline constexpr int SEE_QS_THRESHOLD      = -100;
+// SEE threshold for qsearch captures — skip captures losing more than this
+inline constexpr int SEE_QS_THRESHOLD = -100;
+// SEE threshold for normal search captures — more lenient than qsearch
 inline constexpr int SEE_CAPTURE_THRESHOLD = -20;
 
-// History table sizes / limits
+// History values are gravity-clamped to this limit to prevent overflow
 inline constexpr int HISTORY_MAX       = 16384;
 inline constexpr int CAPT_HIST_MAX     = 16384;
 inline constexpr int PAWN_HISTORY_SIZE = 16384;
@@ -45,22 +46,23 @@ inline constexpr int QUIET_PRUNE_DISABLED = -32000000;
     return 2 * bool(threats & square_bb(from)) + bool(threats & square_bb(to));
 }
 
-// Butterfly history
+// [color][from][to][threat_index] — main quiet move history indexed by threat context
 using ButterflyHistory = int[COLOR_NB][SQUARE_NB][SQUARE_NB][4];
 
-// PieceTo history
+// [color][piece_type][to][threat_index] — used for continuation history tables
 using PieceToHistory = int[COLOR_NB][PIECE_TYPE_NB][SQUARE_NB][4];
 
-// Capture history
+// [color][attacker][to][victim][threat_index] — history for capture moves
 using CaptureHistory = int[COLOR_NB][PIECE_TYPE_NB][SQUARE_NB][PIECE_TYPE_NB][4];
 
-// Continuation history
+// [piece_type][to] — single-ply continuation history entry
 using ContinuationHistory = int[PIECE_TYPE_NB][SQUARE_NB];
 
-// Pawn history
+// [pawn_key % size][piece_type][to] — history conditioned on pawn structure
 using PawnHistory = int[PAWN_HISTORY_SIZE][PIECE_TYPE_NB][SQUARE_NB];
 
-// Move ordering stages
+// Staged move ordering: moves are generated and returned in priority order
+// Good captures first, then killers/counter, then quiets, then bad captures
 enum PickStage {
     STAGE_TT,
     STAGE_INIT_CAPTURES,
