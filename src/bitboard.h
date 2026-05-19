@@ -24,6 +24,16 @@
 
 namespace Catalyst {
 
+// -----------------------------------------------------------------------------
+// Bitboard attack generation and lookup tables
+// -----------------------------------------------------------------------------
+// This module provides precomputed attack bitboards for all piece types and
+// magic bitboard tables for sliding piece (rook/bishop) attack generation.
+// Two backends are supported:
+//   - BMI2 (pext): uses x86 parallel bit extraction for O(1) index computation
+//   - Fallback (multiply+shift): portable magic bitboard hashing
+// The appropriate backend is selected at runtime in init_bitboards().
+
 struct alignas(64) MagicPext {
     Bitboard  mask;
     Bitboard *attacks;
