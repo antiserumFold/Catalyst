@@ -296,6 +296,9 @@ void Board::update_state(StateInfo *si)
 
 void Board::update_blockers(StateInfo *si)
 {
+    // Find pinned pieces and discovery threats for both kings.
+    // A blocker is a piece on the line between king and an enemy slider.
+    // If the blocker moves (and isn't replacing with another blocker), the slider attacks the king.
     if (!pieces(KING, WHITE) || !pieces(KING, BLACK))
     {
         std::cerr << "FATAL: king missing in update_blockers!\n";
@@ -307,6 +310,7 @@ void Board::update_blockers(StateInfo *si)
         Bitboard pinners  = 0;
         Bitboard blockers = 0;
 
+        // Snipers = enemy sliders that attack the king if all blockers removed.
         Bitboard snipers = ((PseudoAttacks[ROOK][ksq] & pieces(QUEEN, ROOK))
                                | (PseudoAttacks[BISHOP][ksq] & pieces(QUEEN, BISHOP)))
                            & pieces(~c);
@@ -316,6 +320,8 @@ void Board::update_blockers(StateInfo *si)
             Square   sniperSq = pop_lsb(snipers);
             Bitboard b        = between_bb(ksq, sniperSq) & pieces();
 
+            // Exactly one piece between king and sniper = pinned or blocking.
+            // If it's our piece, it's pinned. The sniper is a potential discovery threat.
             if (b && !more_than_one(b))
             {
                 blockers |= b;
