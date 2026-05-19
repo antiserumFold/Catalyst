@@ -130,6 +130,7 @@ public:
   [[nodiscard]] FORCE_INLINE bool is_capture_or_promotion(Move m) const { return is_capture(m) || is_promotion(m); }
     // clang-format on
 
+    //  Attack and legality queries
     [[nodiscard]] Square   castling_rook_square(CastlingRights cr) const;
     [[nodiscard]] Bitboard blockers_for_king(Color c) const;
     [[nodiscard]] Bitboard check_blockers(Color c, Color kingColor) const;
@@ -174,6 +175,7 @@ private:
     Bitboard castlingPath[CASTLING_RIGHTS_NB];
     Square   castlingRookSquare[CASTLING_RIGHTS_NB];
 
+    // Internal helpers
     void clear();
     void put_piece(Piece pc, Square sq);
     void remove_piece(Square sq);
