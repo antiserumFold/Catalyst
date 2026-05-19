@@ -23,6 +23,8 @@
 namespace Catalyst {
 
 namespace Zobrist {
+    // Zobrist hashing: pseudo-random keys XORed together for incremental position hash updates.
+    // Init must be called before any Board operations
     extern Key psq[PIECE_NB][SQUARE_NB];
     extern Key enpassant[FILE_NB];
     extern Key castling[CASTLING_RIGHTS_NB];
@@ -32,20 +34,32 @@ namespace Zobrist {
 }  // namespace Zobrist
 
 struct alignas(64) StateInfo {
-    Key    key;
-    Key    pawnKey;
-    Key    nonPawnKey[COLOR_NB];
-    int    castlingRights;
+    // Full 64-byte Zobrist hash of the position (incrementally updated on make_move)
+    Key key;
+    // Hash of only pawn positions (used for pawn structure evaluation / history)
+    Key pawnKey;
+    // Separate non-pawn hashes per color (for correction history indexing)
+    Key nonPawnKey[COLOR_NB];
+    // Bitmask of remaining castling rights (WHITE_OO | WHITE_OOO | BLACK_OO | BLACK_OOO)
+    int castlingRights;
+    // En passant target square, or SQ_NONE if no ep available this turn
     Square epSquare;
-    int    rule50;
-    int    pliesFromNull;
+    // Count of half-moves since last capture or pawn move (for 50-move rule)
+    int rule50;
+    // Plies since last null move (used to prevent consecutive null moves)
+    int pliesFromNull;
 
+    // Bitboard of all pieces giving check to the side-to-move's king
     Bitboard checkersBB;
+    // Bitboard of pieces blocking attacks on the king (pinned pieces + discovery blockers)
     Bitboard blockersForKing[COLOR_NB];
+    // Bitboard of enemy pieces that would give discovered check if blocker moved
     Bitboard pinners[COLOR_NB];
-    Piece    capturedPiece;
-    uint8_t  _pad[7];
+    // Piece captured by the move that created this state (NO_PIECE if none)
+    Piece   capturedPiece;
+    uint8_t _pad[7];
 
+    // ADD: Pointer to previous state (forms a stack for unmake_move traversal)
     StateInfo *previous;
 };
 static_assert(sizeof(StateInfo) == 128, "StateInfo size mismatch — check padding");
