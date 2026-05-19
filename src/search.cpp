@@ -36,6 +36,8 @@ int LMRTable[2][64][64];
 
 void init_lmr()
 {
+    // Precompute LMR reductions: base + scale * log(depth) * log(moveCount)
+    //  Quiet moves reduced more aggressively than noisy (captures/promotions).
     for (int d = 1; d < 64; ++d)
         for (int m = 1; m < 64; ++m)
         {
@@ -53,6 +55,7 @@ Search::Search()
 
 void Search::clear_tables()
 {
+    // Full reset of all heuristic tables. Called on ucinewgame, NOT between moves.
     std::memset(history_, 0, sizeof(history_));
     std::memset(pieceToHistory_, 0, sizeof(pieceToHistory_));
     std::memset(captureHistory_, 0, sizeof(captureHistory_));
@@ -80,6 +83,7 @@ void Search::clear_tables()
 // ---------------------------------------------------------------------------
 bool Search::is_valid_tt_move(const Board &board, Move m) const
 {
+    // Fast rejection of obviously corrupted TT moves before legality test.
     if (m == MOVE_NONE)
         return false;
     Square from = from_sq(m);
@@ -103,6 +107,8 @@ bool Search::is_valid_tt_move(const Board &board, Move m) const
 // ---------------------------------------------------------------------------
 int Search::quiet_hist_score(const Board &board, Color us, Move m, PieceType movedPt, int ply) const
 {
+    // Aggregate of butterfly, piece-to, pawn, and continuation histories (ply-1 to ply-4).
+    // Higher = historically good move; lower = historically bad.
     int butterfly
         = history_[us][from_sq(m)][to_sq(m)][threat_index(from_sq(m), to_sq(m), ss(ply)->threats)];
     int pieceTo = pieceToHistory_[us][movedPt][to_sq(m)]
@@ -155,7 +161,8 @@ void Search::update_quiet_histories(const Board &board,
     int                                          triedCount,
     Bitboard                                     threats,
     bool                                         improving)
-{
+{  // Update quiet histories with gravity. Best move gets bonus, all tried quiets get malus.
+    // Continuation history uses a "bestBase" normalization to avoid over-updating.
     int                  bonus = stat_bonus(histDepth);
     int                  malus = -stat_malus(histDepth);
     int                  phIdx = pawn_history_index(board.pawn_key());
@@ -247,6 +254,7 @@ void Search::update_quiet_histories(const Board &board,
 }
 
 void Search::update_capture_histories(const Board & /*board*/,
+    // Simpler than quiet update: only captureHistory table, no continuation component.
     Color      us,
     Move       bestMove,
     PieceType  bestPt,
@@ -281,6 +289,8 @@ void Search::update_capture_histories(const Board & /*board*/,
 // ---------------------------------------------------------------------------
 bool Search::opponent_has_winning_capture(const Board &board) const
 {
+    // Check if any opponent piece can capture one of our pieces with SEE >= 0.
+    // Used for pruning heuristics that depend on tactical safety.
     Color    them = ~board.side_to_move();
     Bitboard occ  = board.pieces();
     for (PieceType pt = PAWN; pt <= QUEEN; ++pt)
@@ -345,6 +355,8 @@ bool Search::is_shuffling(Move m, int ply) const
 // ---------------------------------------------------------------------------
 int Search::adjusted_eval(const Board &board, int ply)
 {
+    // Apply correction history to NNUE eval, then scale toward draw by 50-move rule.
+    // Clamped to avoid mate score overlap.
     int   raw = NNUE::evaluate(accStack_, board, board.side_to_move());
     Color us  = board.side_to_move();
 
@@ -380,6 +392,8 @@ void Search::update_correction(const Board &board,
     int                                     depth,
     bool                                    bestIsCap)
 {
+    //  Update all correction tables with (searchScore - staticEval) * depth / 8.
+    //  Skipped on tactical cutoffs or mate scores.
     if (bestIsCap || depth < 2 || staticEval == SCORE_NONE)
         return;
     if (is_mate_score(searchScore) || is_mate_score(staticEval))
@@ -464,6 +478,7 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
         return draw_score();
 
     // TT probe
+    // TT probe in q-search: accept exact scores and cutoffs, but depth is always 0 or negative.
     bool     ttHit   = false;
     TTEntry *ttEntry = tt.probe(board.key(), ttHit);
     Move     ttMove  = MOVE_NONE;
@@ -508,6 +523,7 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
             return standPat;
     }
 
+    // Use a separate buffer from negamax to avoid aliasing (q-search can be called recursively).
     ss(ply)->staticEval = inCheck ? SCORE_NONE : standPat;
 
     // Use a local buffer — never alias with negamax buffers
@@ -537,6 +553,8 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
 
         if (!inCheck && !givesCheck && isCapture && !isPromo)
         {
+            // Delta pruning: if capturing this piece + margin still below alpha, skip.
+            // Only applies when not in check and capture doesn't give check.
             PieceType captPt = piece_type(board.piece_on(to_sq(m)));
             int       futVal = standPat + PIECE_VALUE[captPt] + 200;
             if (futVal <= alpha)
@@ -638,6 +656,7 @@ int Search::negamax(Board &board,
 
     if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
         return 0;
+    // Maximum ply reached — return static eval to avoid stack overflow.
     if (ply >= MAX_PLY - 1)
         return adjusted_eval(board, ply);
 
@@ -855,6 +874,9 @@ int Search::negamax(Board &board,
     }
 
     // ── Hindsight depth adjustment ────────────────────────────────────────────
+    // Adjust depth based on previous reduction and eval trends.
+    // Extend if prior reduction was large and opponent didn't worsen.
+    // Reduce if both sides' evals are high (tactical, less pruning needed).
     if (!inCheck && excludedMove == MOVE_NONE)
     {
         if (priorReduction >= 3 * LMR_FRAC && !opponentWorsening)
@@ -895,6 +917,8 @@ int Search::negamax(Board &board,
                 | board.pieces(ROOK, board.side_to_move())
                 | board.pieces(QUEEN, board.side_to_move())))
         {
+            // Pass the turn to opponent. If they still can't get below beta, we're too good.
+            // Verification search at reduced depth avoids zugzwang false positives.
             int R
                 = std::min(NMP_BASE_R + depth / 3 + std::min(2, (staticEval - beta) / NMP_EVAL_DIV),
                     depth);
@@ -1401,6 +1425,7 @@ int Search::negamax(Board &board,
 
     // NEW: ttPv propagation — if we fail low, inherit parent's ttPv flag
     // This helps move ordering on re-searches by remembering PV history
+    // Propagate PV flag to help move ordering on re-searches.
     if (bestScore <= origAlpha)
         cur->ttPv = cur->ttPv || (ply > 0 && ss(ply - 1)->ttPv);
 
