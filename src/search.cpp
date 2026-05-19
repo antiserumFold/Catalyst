@@ -869,7 +869,7 @@ int Search::negamax(Board &board,
 
         if (ply >= 1 && (cur - 1)->staticEval != SCORE_NONE)
             opponentWorsening = staticEval + (cur - 1)->staticEval > 1;
-        // NEW: improving if static eval already beats beta
+        // improving if static eval already beats beta
         improving |= staticEval >= beta;
     }
 
@@ -1024,7 +1024,7 @@ int Search::negamax(Board &board,
     if (depth >= IIR_MIN_DEPTH && ttMove == MOVE_NONE && excludedMove == MOVE_NONE && !inCheck)
         --depth;
 
-    // NEW: small probcut — if TT says this node is likely to fail high by a large
+    // Small probcut — if TT says this node is likely to fail high by a large
     // margin, return early without searching moves
     if (!pvNode && excludedMove == MOVE_NONE && ttFlag == TT_LOWER && ttDepth >= depth - 4
         && ttScore >= beta + 416 && !is_mate_score(beta) && !is_mate_score(ttScore))
@@ -1423,7 +1423,7 @@ int Search::negamax(Board &board,
         gravity(pawnHistory_[phIdx][(cur - 1)->movedPt][to_sq(prev)], bonus / 2, HISTORY_MAX);
     }
 
-    // NEW: ttPv propagation — if we fail low, inherit parent's ttPv flag
+    // ttPv propagation — if we fail low, inherit parent's ttPv flag
     // This helps move ordering on re-searches by remembering PV history
     // Propagate PV flag to help move ordering on re-searches.
     if (bestScore <= origAlpha)
@@ -1436,16 +1436,17 @@ int Search::negamax(Board &board,
         update_correction(board, ply, cur->staticEval, bestScore, depth, bestIsCap);
 
     // TT store
+    // Store search result in TT. isPV flag helps distinguish PV nodes for IIR/LMR.
     if (!(stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes))
         && excludedMove == MOVE_NONE && std::abs(bestScore) < SCORE_INFINITE)
     {
         TTFlag flag;
         if (alpha >= beta)
-            flag = TT_LOWER;
+            flag = TT_LOWER;  // Beta cutoff — score is a lower bound.
         else if (alpha > origAlpha)
-            flag = TT_EXACT;
+            flag = TT_EXACT;  // Alpha raised — exact score within window.
         else
-            flag = TT_UPPER;
+            flag = TT_UPPER;  // Fail low — score is an upper bound.
 
         int storeScore = bestScore;
         if (flag == TT_LOWER && !is_mate_score(bestScore) && depth > 0)
@@ -1509,6 +1510,7 @@ Move Search::best_move(Board &board, TimeManager &tm)
 
         if (depth >= 6 && !nearMate)
         {
+            // Aspiration window: start narrow, widen on fail-low/fail-high.
             int delta  = ASP_INIT_DELTA + bestScore * bestScore / 13000;
             int wAlpha = bestScore - delta;
             int wBeta  = bestScore + delta;
@@ -1530,6 +1532,7 @@ Move Search::best_move(Board &board, TimeManager &tm)
                     delta += delta / 2;
                 }
                 else if (score >= wBeta)
+                //  Fail high: score above window — widen upward and save best move.
                 {
                     wBeta = std::min(wBeta + delta, SCORE_INFINITE);
                     delta += delta / 2;
