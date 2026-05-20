@@ -119,7 +119,7 @@ private:
     [[nodiscard]] FORCE_INLINE int replacement_score(const TTEntry &e) const
     {
         uint8_t age = (currentGen - (e.agePvBound & TT_AGE_MASK)) & TT_AGE_MASK;
-        return int(e.depth) - int(age) * 2;
+        return int(e.depth) - int(age);
     }
 };
 
