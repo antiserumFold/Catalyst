@@ -1441,16 +1441,14 @@ int Search::negamax(Board &board,
         && excludedMove == MOVE_NONE && std::abs(bestScore) < SCORE_INFINITE)
     {
         TTFlag flag;
-        if (alpha >= beta)
+        if (bestScore >= beta)
             flag = TT_LOWER;  // Beta cutoff — score is a lower bound.
-        else if (alpha > origAlpha)
+        else if (bestScore > origAlpha)
             flag = TT_EXACT;  // Alpha raised — exact score within window.
         else
             flag = TT_UPPER;  // Fail low — score is an upper bound.
 
         int storeScore = bestScore;
-        if (flag == TT_LOWER && !is_mate_score(bestScore) && depth > 0)
-            storeScore = (bestScore * depth + beta) / (depth + 1);
 
         int storeEval = (rawEval != SCORE_NONE && std::abs(rawEval) < SCORE_INFINITE) ? rawEval : 0;
         tt.store(board.key(),
