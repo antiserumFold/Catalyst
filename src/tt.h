@@ -24,13 +24,20 @@
 
 namespace Catalyst {
 
-// Depth is stored as uint8_t with an offset to allow negative depths to be stored
+// Depth stored as uint8_t with offset so QS depths (negative) are representable.
+// Occupancy is determined by hashKey != 0, not by depth, so depth=0 is a valid stored depth.
 constexpr int TT_DEPTH_OFFSET = 7;
 
-// Age increments in steps of 8 so the lower 3 bits are free for PV and flag bits
-// agePvBound layout: [age: 5 bits][isPv: 1 bit][flag: 2 bits]
-constexpr uint8_t TT_AGE_INC  = 8;
-constexpr uint8_t TT_AGE_MASK = 0xF8;
+// agePvBound layout: [age: 5 bits | isPv: 1 bit | flag: 2 bits]
+// Age increments by TT_AGE_INC each new_search() so the lower 3 bits stay free.
+constexpr uint8_t TT_AGE_INC   = 8;
+constexpr uint8_t TT_AGE_MASK  = 0xF8;
+constexpr int     TT_AGE_CYCLE = 256;
+
+// Number of age generations one depth unit is worth in the replacement formula.
+// Normalises age (in raw units of TT_AGE_INC) so that each generation == this many depth units.
+// Chosen so ~4 generations old ≈ surrendering 8 depth → aggressively evict stale entries.
+constexpr int TT_AGE_WEIGHT = TT_AGE_CYCLE / TT_AGE_INC;  // 32
 
 enum TTFlag : uint8_t {
     TT_NONE  = 0,
@@ -39,8 +46,9 @@ enum TTFlag : uint8_t {
     TT_UPPER = 3
 };
 
-// 16 bytes per entry, 4 entries per cluster = one 64-byte cache line per cluster
-// hashKey is only 32 bits (upper 32 bits of the Zobrist key) to save space
+// 16 bytes per entry × 4 entries per cluster = one 64-byte cache line per cluster.
+// hashKey: upper 32 bits of the Zobrist key (lower 32 used for cluster indexing).
+// Occupancy is signalled by hashKey != 0 (a zero key is astronomically rare; treat as empty).
 struct TTEntry {
     uint32_t hashKey;
     uint16_t move;
@@ -58,7 +66,7 @@ struct TTEntry {
     [[nodiscard]] FORCE_INLINE int    get_eval() const { return int(eval); }
     [[nodiscard]] FORCE_INLINE bool   is_pv() const { return (agePvBound & 0x4) != 0; }
     [[nodiscard]] FORCE_INLINE int    get_rule50() const { return int(rule50); }
-    [[nodiscard]] FORCE_INLINE bool   is_empty() const { return depth == 0; }
+    [[nodiscard]] FORCE_INLINE bool   is_occupied() const { return hashKey != 0; }
 };
 
 static_assert(sizeof(TTEntry) == 16, "TTEntry must be 16 bytes");
@@ -68,6 +76,42 @@ struct alignas(64) TTCluster {
 };
 
 static_assert(sizeof(TTCluster) == 64, "TTCluster must be 64 bytes");
+
+// Snapshot of a probed entry returned by value — safe to read after store() is called.
+// Separating the read snapshot from the write pointer (TTWriter) keeps the interface clean
+// and ensures search code never accidentally reads through a stale/overwritten pointer.
+struct TTData {
+    Move   move;
+    int    score;
+    int    eval;
+    int    depth;
+    int    rule50;
+    TTFlag flag;
+    bool   is_pv;
+};
+
+// Thin write handle returned alongside TTData by probe().
+// Storing through TTWriter instead of a raw TTEntry* makes the write boundary explicit
+// and will be trivially correct when SMP is added.
+struct TTWriter {
+    void save(Key key,
+        int       score,
+        int       depth,
+        TTFlag    flag,
+        Move      move,
+        int       eval,
+        int       rule50,
+        bool      isPv,
+        uint8_t   currentGen);
+
+private:
+    friend class TT;
+    TTEntry *entry;
+    explicit TTWriter(TTEntry *e)
+        : entry(e)
+    {
+    }
+};
 
 class TT {
 public:
@@ -79,24 +123,21 @@ public:
     void new_search();
     void prefetch(Key key) const;
 
-    void store(Key key,
-        int        score,
-        int        depth,
-        TTFlag     flag,
-        Move       move,
-        int        eval,
-        int        rule50,
-        bool       isPv = false);
+    // Returns {hit, data_snapshot, writer}.
+    // On hit:  data_snapshot holds a copy of the matching entry; writer points to it.
+    // On miss: data_snapshot is zeroed; writer points to the best replacement candidate.
+    // The age of a hit entry is refreshed transparently via the writer on the next store().
+    [[nodiscard]] std::tuple<bool, TTData, TTWriter> probe(Key key) const;
 
-    [[nodiscard]] TTEntry *probe(Key key, bool &found);
-    [[nodiscard]] int      hashfull() const;
+    [[nodiscard]] int hashfull() const;
+
+    uint8_t generation() const { return currentGen; }
 
 private:
     TTCluster *table       = nullptr;
     size_t     numClusters = 0;
     uint8_t    currentGen  = 0;
 
-    // Fast modulo-free cluster index using 128-bit multiply trick (avoids division)
     [[nodiscard]] FORCE_INLINE size_t index(Key key) const
     {
 #ifdef __SIZEOF_INT128__
@@ -114,19 +155,19 @@ private:
 #endif
     }
 
-    // Replacement policy: prefer replacing old entries (high age) and shallow entries (low depth)
-    // Age difference is weighted x2 relative to depth to strongly prefer fresh entries
+    // Replacement score: higher = more valuable = less likely to be evicted.
+    // Age is normalised by TT_AGE_WEIGHT so each generation costs as many points as
+    // TT_AGE_WEIGHT depth units, making stale entries lose out heavily to fresh ones.
     [[nodiscard]] FORCE_INLINE int replacement_score(const TTEntry &e) const
     {
-        uint8_t age = (currentGen - (e.agePvBound & TT_AGE_MASK)) & TT_AGE_MASK;
-        return int(e.depth) - int(age);
+        const int age = (TT_AGE_CYCLE + currentGen - (e.agePvBound & TT_AGE_MASK)) & TT_AGE_MASK;
+
+        return int(e.depth) - age * TT_AGE_WEIGHT / TT_AGE_INC;
     }
 };
 
 extern TT tt;
 
-// Mate scores are stored relative to root but must be adjusted to/from ply-relative form
-// so the same mate distance is preserved regardless of which ply the entry was stored at
 [[nodiscard]] FORCE_INLINE int score_to_tt(int score, int ply)
 {
     if (score >= SCORE_MATE_IN_MAX_PLY)
