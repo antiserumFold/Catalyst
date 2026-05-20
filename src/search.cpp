@@ -477,24 +477,25 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
     if (board.is_draw(ply))
         return draw_score();
 
-    // TT probe
     // TT probe in q-search: accept exact scores and cutoffs, but depth is always 0 or negative.
-    bool     ttHit   = false;
-    TTEntry *ttEntry = tt.probe(board.key(), ttHit);
-    Move     ttMove  = MOVE_NONE;
-    int      ttScore = SCORE_NONE;
-    TTFlag   ttFlag  = TT_NONE;
+    auto     probeResult = tt.probe(board.key());
+    bool     ttHit       = std::get<0>(probeResult);
+    TTData   ttData      = std::get<1>(probeResult);
+    TTWriter ttWriter    = std::get<2>(probeResult);
+    Move     ttMove      = MOVE_NONE;
+    int      ttScore     = SCORE_NONE;
+    TTFlag   ttFlag      = TT_NONE;
 
     if (ttHit)
     {
-        Move rawTT = ttEntry->get_move();
-        ttScore    = score_from_tt(ttEntry->get_score(), ply);
-        ttFlag     = ttEntry->get_flag();
+        Move rawTT = ttData.move;
+        ttScore    = score_from_tt(ttData.score, ply);
+        ttFlag     = ttData.flag;
 
         if (is_valid_tt_move(board, rawTT))
             ttMove = rawTT;
 
-        if (ttEntry->get_depth() >= 0)
+        if (ttData.depth >= 0)
         {
             if (ttFlag == TT_EXACT)
                 return ttScore;
@@ -610,14 +611,15 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
         TTFlag flag = (bestScore >= beta) ? TT_LOWER : TT_UPPER;
         int    storeEval
             = (standPat != SCORE_NONE && std::abs(standPat) < SCORE_INFINITE) ? standPat : 0;
-        tt.store(board.key(),
+        ttWriter.save(board.key(),
             score_to_tt(bestScore, ply),
             -1,
             flag,
             MOVE_NONE,
             storeEval,
             board.rule50_count(),
-            false);
+            false,
+            tt.generation());
     }
 
     return bestScore;
@@ -717,22 +719,24 @@ int Search::negamax(Board &board,
     }
 
     // ── TT probe ──────────────────────────────────────────────────────────────
-    bool     ttHit   = false;
-    TTEntry *ttEntry = tt.probe(board.key(), ttHit);
-    Move     ttMove  = MOVE_NONE;
-    int      ttScore = SCORE_NONE;
-    int      ttDepth = 0;
-    int      ttEval  = SCORE_NONE;
-    TTFlag   ttFlag  = TT_NONE;
-    bool     ttPV    = pvNode;
+    auto     probeResult = tt.probe(board.key());
+    bool     ttHit       = std::get<0>(probeResult);
+    TTData   ttData      = std::get<1>(probeResult);
+    TTWriter ttWriter    = std::get<2>(probeResult);
+    Move     ttMove      = MOVE_NONE;
+    int      ttScore     = SCORE_NONE;
+    int      ttDepth     = 0;
+    int      ttEval      = SCORE_NONE;
+    TTFlag   ttFlag      = TT_NONE;
+    bool     ttPV        = pvNode;
 
     if (ttHit && excludedMove == MOVE_NONE)
     {
-        Move rawTT = ttEntry->get_move();
-        ttScore    = score_from_tt(ttEntry->get_score(), ply);
-        ttDepth    = ttEntry->get_depth();
-        ttFlag     = ttEntry->get_flag();
-        ttEval     = ttEntry->get_eval();
+        Move rawTT = ttData.move;
+        ttScore    = score_from_tt(ttData.score, ply);
+        ttDepth    = ttData.depth;
+        ttFlag     = ttData.flag;
+        ttEval     = ttData.eval;
         ttPV |= (ttFlag == TT_EXACT);
 
         if (is_valid_tt_move(board, rawTT))
@@ -815,7 +819,15 @@ int Search::negamax(Board &board,
         cur->complexity = std::abs(staticEval - rawEval);
 
         if (!ttHit && excludedMove == MOVE_NONE && depth >= 4)
-            tt.store(board.key(), 0, 0, TT_NONE, MOVE_NONE, rawEval, board.rule50_count(), false);
+            ttWriter.save(board.key(),
+                0,
+                0,
+                TT_NONE,
+                MOVE_NONE,
+                rawEval,
+                board.rule50_count(),
+                false,
+                tt.generation());
 
         if (ttHit && ttFlag != TT_NONE)
         {
@@ -1007,14 +1019,15 @@ int Search::negamax(Board &board,
 
             if (pcScore >= pcBeta)
             {
-                tt.store(board.key(),
+                ttWriter.save(board.key(),
                     score_to_tt(pcScore, ply),
                     depth - 3,
                     TT_LOWER,
                     m,
                     rawEval != SCORE_NONE ? rawEval : 0,
                     board.rule50_count(),
-                    false);
+                    false,
+                    tt.generation());
                 return pcScore;
             }
         }
@@ -1186,14 +1199,15 @@ int Search::negamax(Board &board,
             else if (singBeta >= beta)
             {
                 int mcScore = std::min(singBeta, SCORE_MATE_IN_MAX_PLY - 1);
-                tt.store(board.key(),
+                ttWriter.save(board.key(),
                     score_to_tt(mcScore, ply),
                     depth / 2,
                     TT_LOWER,
                     m,
                     rawEval != SCORE_NONE ? rawEval : 0,
                     board.rule50_count(),
-                    false);
+                    false,
+                    tt.generation());
                 return mcScore;
             }
             else if (ttScore >= beta)
@@ -1451,14 +1465,15 @@ int Search::negamax(Board &board,
         int storeScore = bestScore;
 
         int storeEval = (rawEval != SCORE_NONE && std::abs(rawEval) < SCORE_INFINITE) ? rawEval : 0;
-        tt.store(board.key(),
+        ttWriter.save(board.key(),
             score_to_tt(storeScore, ply),
             depth,
             flag,
             bestMove,
             storeEval,
             board.rule50_count(),
-            isPV);
+            isPV,
+            tt.generation());
     }
 
     return bestScore;

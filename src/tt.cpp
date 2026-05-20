@@ -30,9 +30,49 @@
 #define USE_MADVISE
 #endif
 
+#if defined(_WIN32)
+#include <cstdlib>
+#endif
+
 namespace Catalyst {
 
 TT tt;
+
+namespace {
+
+    void *alloc_aligned(size_t size)
+    {
+#if defined(USE_MADVISE)
+        constexpr size_t alignment = 2 * 1024 * 1024;
+        const size_t     padded    = (size + alignment - 1) / alignment * alignment;
+        void            *mem       = nullptr;
+        if (posix_memalign(&mem, alignment, padded) != 0)
+            mem = nullptr;
+        if (mem)
+            madvise(mem, padded, MADV_HUGEPAGE);
+        return mem;
+#elif defined(_WIN32)
+        return _aligned_malloc(size, 64);
+#else
+        constexpr size_t alignment = 64;
+        const size_t     padded    = (size + alignment - 1) / alignment * alignment;
+        void            *mem       = nullptr;
+        if (posix_memalign(&mem, alignment, padded) != 0)
+            mem = nullptr;
+        return mem;
+#endif
+    }
+
+    void free_aligned(void *ptr)
+    {
+#if defined(_WIN32)
+        _aligned_free(ptr);
+#else
+        free(ptr);
+#endif
+    }
+
+}
 
 TT::TT()
 {
@@ -41,78 +81,41 @@ TT::TT()
 
 TT::~TT()
 {
-    if (table)
-    {
-#if defined(_WIN32)
-        _aligned_free(table);
-#else
-        free(table);
-#endif
-        table = nullptr;
-    }
+    free_aligned(table);
+    table = nullptr;
 }
 
 void TT::resize(size_t mb)
 {
     mb = std::max(mb, size_t(1));
 
-    if (table)
-    {
-#if defined(_WIN32)
-        _aligned_free(table);
-#else
-        free(table);
-#endif
-        table = nullptr;
-    }
+    free_aligned(table);
+    table = nullptr;
 
     const size_t bytes = mb * 1024 * 1024;
     numClusters        = bytes / sizeof(TTCluster);
-
     if (numClusters == 0)
         numClusters = 1;
 
-    const size_t allocSize = numClusters * sizeof(TTCluster);
-
-#if defined(USE_MADVISE)
-    constexpr size_t alignment = 2 * 1024 * 1024;
-#elif defined(_WIN32)
-    constexpr size_t alignment = 64;
-#else
-    constexpr size_t alignment = 64;
-#endif
-
-#if defined(_WIN32)
-    table = reinterpret_cast<TTCluster *>(_aligned_malloc(allocSize, alignment));
-#else
-    const size_t paddedSize = (allocSize + alignment - 1) / alignment * alignment;
-    if (posix_memalign(reinterpret_cast<void **>(&table), alignment, paddedSize) != 0)
-        table = nullptr;
-#endif
+    table = reinterpret_cast<TTCluster *>(alloc_aligned(numClusters * sizeof(TTCluster)));
 
     if (!table)
     {
-        std::cerr << "TT allocation failed, retrying with half size\n";
+        std::cerr << "TT allocation failed for " << mb << "MB, retrying with half\n";
         resize(mb / 2);
         return;
     }
 
-#if defined(USE_MADVISE)
-    madvise(table, allocSize, MADV_HUGEPAGE);
-#endif
-
     clear();
 }
 
-// Parallel clear using up to 8 threads for faster initialization on large TT sizes
 void TT::clear()
 {
     if (!table)
         return;
 
-    size_t numThreads = std::min(size_t(std::thread::hardware_concurrency()), size_t(8));
-    if (numThreads == 0)
-        numThreads = 1;
+    size_t numThreads
+        = std::clamp(size_t(std::thread::hardware_concurrency()), size_t(1), size_t(8));
 
     const size_t perThread = numClusters / numThreads;
 
@@ -122,7 +125,7 @@ void TT::clear()
     for (size_t t = 0; t < numThreads; ++t)
     {
         const size_t start = t * perThread;
-        const size_t end   = (t == numThreads - 1) ? numClusters : start + perThread;
+        const size_t end   = (t + 1 == numThreads) ? numClusters : start + perThread;
         threads.emplace_back([this, start, end]() {
             std::memset(&table[start], 0, (end - start) * sizeof(TTCluster));
         });
@@ -136,7 +139,7 @@ void TT::clear()
 
 void TT::new_search()
 {
-    currentGen += TT_AGE_INC;
+    currentGen = (currentGen + TT_AGE_INC) & TT_AGE_MASK;
 }
 
 void TT::prefetch(Key key) const
@@ -151,19 +154,24 @@ void TT::prefetch(Key key) const
 #endif
 }
 
-TTEntry *TT::probe(Key key, bool &found)
+std::tuple<bool, TTData, TTWriter> TT::probe(Key key) const
 {
     TTCluster     *cluster = &table[index(key)];
-    const uint32_t key32   = uint32_t(key);
+    const uint32_t key32   = static_cast<uint32_t>(key >> 32);
 
     for (int i = 0; i < 4; ++i)
     {
         TTEntry &e = cluster->entries[i];
-        if (e.hashKey == key32 && !e.is_empty())
+        if (e.hashKey == key32 && e.is_occupied())
         {
-            e.agePvBound = (e.agePvBound & ~TT_AGE_MASK) | currentGen;
-            found        = true;
-            return &e;
+            TTData data { e.get_move(),
+                e.get_score(),
+                e.get_eval(),
+                e.get_depth(),
+                e.get_rule50(),
+                e.get_flag(),
+                e.is_pv() };
+            return { true, data, TTWriter(&e) };
         }
     }
 
@@ -173,13 +181,10 @@ TTEntry *TT::probe(Key key, bool &found)
     for (int i = 1; i < 4; ++i)
     {
         TTEntry &e = cluster->entries[i];
-
-        if (e.is_empty())
+        if (!e.is_occupied())
         {
-            found = false;
-            return &e;
+            return { false, TTData { }, TTWriter(&e) };
         }
-
         const int s = replacement_score(e);
         if (s < worstScore)
         {
@@ -188,80 +193,42 @@ TTEntry *TT::probe(Key key, bool &found)
         }
     }
 
-    found = false;
-    return replace;
+    return { false, TTData { }, TTWriter(replace) };
 }
 
-void TT::store(Key key,
-    int            score,
-    int            depth,
-    TTFlag         flag,
-    Move           move,
-    int            eval,
-    int            rule50,
-    bool           isPv)
+void TTWriter::save(Key key,
+    int                 score,
+    int                 depth,
+    TTFlag              flag,
+    Move                move,
+    int                 eval,
+    int                 rule50,
+    bool                isPv,
+    uint8_t             currentGen)
 {
-    TTCluster     *cluster = &table[index(key)];
-    const uint32_t key32   = uint32_t(key);
+    const uint32_t key32 = static_cast<uint32_t>(key >> 32);
 
-    TTEntry *replace = nullptr;
+    const bool sameKey    = (entry->hashKey == key32);
+    const bool oldGen     = (entry->agePvBound & TT_AGE_MASK) != currentGen;
+    const bool deepEnough = depth + 4 + int(isPv) * 2 > entry->get_depth();
 
-    for (int i = 0; i < 4; ++i)
-    {
-        TTEntry &e = cluster->entries[i];
-        if (e.hashKey == key32 && !e.is_empty())
-        {
-            replace = &e;
-            break;
-        }
-    }
-
-    if (!replace)
-    {
-        replace        = &cluster->entries[0];
-        int worstScore = replacement_score(*replace);
-
-        for (int i = 1; i < 4; ++i)
-        {
-            TTEntry &e = cluster->entries[i];
-
-            if (e.is_empty())
-            {
-                replace = &e;
-                goto write;
-            }
-
-            const int s = replacement_score(e);
-            if (s < worstScore)
-            {
-                worstScore = s;
-                replace    = &e;
-            }
-        }
-    }
-
-    // Only overwrite an existing entry if: it's an exact score, it belongs to a different position,
-    // it's from a previous search generation, or the new depth is significantly greater
-    if (!(flag == TT_EXACT || replace->hashKey != key32
-            || (replace->agePvBound & TT_AGE_MASK) != currentGen
-            || depth + 4 + int(isPv) * 2 > replace->get_depth()))
+    if (!(flag == TT_EXACT || !sameKey || oldGen || deepEnough))
     {
         if (move != MOVE_NONE)
-            replace->move = uint16_t(move);
+            entry->move = uint16_t(move);
         return;
     }
 
-    if (move == MOVE_NONE && replace->hashKey == key32)
-        move = Move(replace->move);
+    if (move == MOVE_NONE && sameKey)
+        move = entry->get_move();
 
-write:
-    replace->hashKey    = key32;
-    replace->move       = uint16_t(move);
-    replace->score      = int16_t(score);
-    replace->eval       = int16_t(std::clamp(eval, -32000, 32000));
-    replace->rule50     = int16_t(rule50);
-    replace->depth      = uint8_t(depth + TT_DEPTH_OFFSET);
-    replace->agePvBound = currentGen | (isPv ? 0x4 : 0x0) | uint8_t(flag);
+    entry->hashKey    = key32;
+    entry->move       = uint16_t(move);
+    entry->score      = int16_t(score);
+    entry->eval       = int16_t(std::clamp(eval, -32000, 32000));
+    entry->rule50     = int16_t(rule50);
+    entry->depth      = uint8_t(depth + TT_DEPTH_OFFSET);
+    entry->agePvBound = currentGen | (isPv ? 0x4u : 0x0u) | uint8_t(flag);
 }
 
 int TT::hashfull() const
@@ -270,22 +237,18 @@ int TT::hashfull() const
         return 0;
 
     constexpr size_t SAMPLE = 1000;
-    const size_t     stride = std::max(numClusters / SAMPLE, size_t(1));
+    const size_t     count  = std::min(numClusters, SAMPLE);
 
-    size_t filled = 0;
-    size_t count  = 0;
-
-    for (size_t i = 0; i < numClusters; i += stride)
-    {
+    int filled = 0;
+    for (size_t i = 0; i < count; ++i)
         for (int j = 0; j < 4; ++j)
         {
             const TTEntry &e = table[i].entries[j];
-            if (!e.is_empty() && (e.agePvBound & TT_AGE_MASK) == currentGen)
+            if (e.is_occupied() && (e.agePvBound & TT_AGE_MASK) == currentGen)
                 ++filled;
         }
-        ++count;
-    }
 
-    return count > 0 ? int(filled * 1000 / (count * 4)) : 0;
+    return filled * 1000 / int(count * 4);
 }
+
 }
