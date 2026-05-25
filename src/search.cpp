@@ -47,7 +47,9 @@ void init_lmr()
         }
 }
 
-Search::Search()
+Search::Search(int threadIdx, std::atomic<bool> *poolStop)
+    : threadIdx_(threadIdx)
+    , poolStop_(poolStop)
 {
     init_lmr();
     clear_tables();
@@ -468,7 +470,7 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
         }
     }
 
-    if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
+    if ((is_stopped() || tm_->time_up(info_.nodes)))
         return 0;
     if (ply >= MAX_PLY - 1)
         return adjusted_eval(board, ply);
@@ -586,7 +588,7 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
         accStack_.pop();
         --stateSP_;
 
-        if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
+        if ((is_stopped() || tm_->time_up(info_.nodes)))
             return 0;
 
         if (score > bestScore)
@@ -605,7 +607,7 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
     if (bestScore >= beta && !is_mate_score(bestScore) && !is_mate_score(beta))
         bestScore = ilerp(bestScore, beta, QS_FAILHIGH_LERP);
 
-    if (moveCount > 0 && !(stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes))
+    if (moveCount > 0 && !(is_stopped() || tm_->time_up(info_.nodes))
         && std::abs(bestScore) < SCORE_INFINITE)
     {
         TTFlag flag = (bestScore >= beta) ? TT_LOWER : TT_UPPER;
@@ -656,7 +658,7 @@ int Search::negamax(Board &board,
         }
     }
 
-    if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
+    if ((is_stopped() || tm_->time_up(info_.nodes)))
         return 0;
     // Maximum ply reached — return static eval to avoid stack overflow.
     if (ply >= MAX_PLY - 1)
@@ -950,7 +952,7 @@ int Search::negamax(Board &board,
                 accStack_.pop();
                 --stateSP_;
 
-                if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
+                if ((is_stopped() || tm_->time_up(info_.nodes)))
                     return 0;
 
                 if (nullScore >= beta)
@@ -1014,7 +1016,7 @@ int Search::negamax(Board &board,
             accStack_.pop();
             --stateSP_;
 
-            if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
+            if ((is_stopped() || tm_->time_up(info_.nodes)))
                 return 0;
 
             if (pcScore >= pcBeta)
@@ -1334,7 +1336,7 @@ int Search::negamax(Board &board,
         --stateSP_;
         accStack_.pop();
 
-        if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
+        if ((is_stopped() || tm_->time_up(info_.nodes)))
             return 0;
 
         if (score > bestScore)
@@ -1446,13 +1448,13 @@ int Search::negamax(Board &board,
     // Correction history update
     bool bestIsCap = (bestMove != MOVE_NONE) && board.is_capture(bestMove);
     if (excludedMove == MOVE_NONE && staticEval != SCORE_NONE
-        && !(stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
+        && !(is_stopped() || tm_->time_up(info_.nodes)))
         update_correction(board, ply, cur->staticEval, bestScore, depth, bestIsCap);
 
     // TT store
     // Store search result in TT. isPV flag helps distinguish PV nodes for IIR/LMR.
-    if (!(stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes))
-        && excludedMove == MOVE_NONE && std::abs(bestScore) < SCORE_INFINITE)
+    if (!(is_stopped() || tm_->time_up(info_.nodes)) && excludedMove == MOVE_NONE
+        && std::abs(bestScore) < SCORE_INFINITE)
     {
         TTFlag flag;
         if (bestScore >= beta)
@@ -1486,9 +1488,13 @@ Move Search::best_move(Board &board, TimeManager &tm)
 {
     tm_      = &tm;
     stateSP_ = 0;
+    // Only the main thread (idx 0) bumps the TT generation counter.
+    // Helpers share the same TT and must NOT call new_search().
     if (!isSilent)
         tt.new_search();
     info_.reset();
+    completedDepth_ = 0;
+    lastBestMove_   = MOVE_NONE;
     // Light reset — preserve history tables across moves within a game.
     // Full clear_tables() is only called between games (via ucinewgame).
     for (auto &pv : pvTable_)
@@ -1507,9 +1513,21 @@ Move Search::best_move(Board &board, TimeManager &tm)
     int    prevScore = 0;
     PvList savedPV { };
 
-    for (int depth = 1; depth <= limits.depth; ++depth)
+    // ---------------------------------------------------------------------------
+    // Lazy SMP depth perturbation
+    // Helper threads skip depth 1 and start at a slightly higher depth so they
+    // explore different parts of the tree than the main thread.  Odd-indexed
+    // helpers also skip even depths, creating further divergence.
+    // ---------------------------------------------------------------------------
+    const int startDepth = (threadIdx_ == 0)       ? 1
+                           : (threadIdx_ % 2 == 1) ? 1 + (threadIdx_ % 4)
+                                                   : 2 + (threadIdx_ % 4);
+
+    for (int depth = startDepth; depth <= limits.depth; ++depth)
     {
-        if (!isSilent && !limits.infinite && tm_->soft_limit_reached() && depth > 1)
+        // Only the main thread drives time-based early exit.
+        // Helpers keep searching deeper — best_thread() picks the winner.
+        if (threadIdx_ == 0 && !limits.infinite && tm_->soft_limit_reached() && depth > 1)
             break;
 
         info_.selDepth = 0;
@@ -1532,10 +1550,9 @@ Move Search::best_move(Board &board, TimeManager &tm)
             {
                 score = negamax(board, depth, wAlpha, wBeta, 0, true, false);
 
-                if (score == 0
-                    && (stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)))
+                if (score == 0 && (is_stopped() || tm_->time_up(info_.nodes)))
                     break;
-                if (tm_->is_stopped())
+                if (is_stopped())
                     break;
 
                 if (score <= wAlpha)
@@ -1573,9 +1590,9 @@ Move Search::best_move(Board &board, TimeManager &tm)
             savedPV = pvTable_[0];
         }
 
-        if ((stopped.load(std::memory_order_relaxed) || tm_->time_up(info_.nodes)) && depth > 1)
+        if ((is_stopped() || tm_->time_up(info_.nodes)) && depth > 1)
             break;
-        if (tm_->is_stopped() && depth > 1)
+        if (is_stopped() && depth > 1)
             break;
 
         if (info_.bestMove != MOVE_NONE && board.is_legal(info_.bestMove))
@@ -1596,13 +1613,19 @@ Move Search::best_move(Board &board, TimeManager &tm)
             int      delta   = (depth > 1) ? std::abs(score - prevScore) : 0;
             uint64_t totalNodes
                 = sharedNodes_ ? sharedNodes_->load(std::memory_order_relaxed) : info_.nodes;
-            tm_->update_scale(changed, delta, info_.bestMoveNodes, totalNodes, depth, score);
+            // update_scale() modifies TimeManager internal state (scale, stableIters).
+            // Only the main thread owns time management — helpers must never call this.
+            if (threadIdx_ == 0)
+                tm_->update_scale(changed, delta, info_.bestMoveNodes, totalNodes, depth, score);
 
             bestMove        = info_.bestMove;
             prevScore       = bestScore;
             bestScore       = score;
             info_.lastScore = score;
         }
+
+        // Record that we fully completed this depth iteration.
+        completedDepth_ = depth;
 
         if (pvTable_[0].length == 0 && savedPV.length > 0)
             pvTable_[0] = savedPV;
@@ -1616,7 +1639,7 @@ Move Search::best_move(Board &board, TimeManager &tm)
         // at subsequent depths after a short mate has already been found)
         if (is_mate_score(bestScore) && std::abs(bestScore) >= SCORE_MATE - 6)
             break;
-        if (!isSilent && !limits.infinite && tm_->soft_limit_reached())
+        if (threadIdx_ == 0 && !limits.infinite && tm_->soft_limit_reached())
             break;
     }
 
@@ -1628,7 +1651,8 @@ Move Search::best_move(Board &board, TimeManager &tm)
             bestMove = *moves.begin();
     }
 
-    tm_ = nullptr;
+    lastBestMove_ = bestMove;
+    tm_           = nullptr;
     return bestMove;
 }
 
