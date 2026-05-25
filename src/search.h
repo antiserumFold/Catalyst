@@ -159,18 +159,21 @@ struct SearchInfo {
 
 class Search {
 public:
-    Search();
+    // threadIdx : 0 = main thread, 1..N = helpers
+    // poolStop  : shared atomic owned by ThreadPool — all threads poll this
+    explicit Search(int threadIdx = 0, std::atomic<bool> *poolStop = nullptr);
 
     std::atomic<uint64_t> *sharedNodes_ = nullptr;
     bool                   isSilent     = false;
-    std::atomic<bool>      stopped { false };
 
     Move best_move(Board &board, TimeManager &tm);
-    void stop()
-    {
-        if (tm_)
-            tm_->stop();
-    }
+
+    // Return the best move found in the last search (safe to call after best_move returns).
+    Move best_move_result() const { return lastBestMove_; }
+
+    // Depth of the last completed iteration (used by best_thread selection).
+    int completed_depth() const { return completedDepth_; }
+
     uint64_t nodes() const { return info_.nodes; }
     int      last_score() const { return info_.lastScore; }
     void     clear_tables();
@@ -187,7 +190,19 @@ public:
         return tmp.see_ge(m, threshold);
     }
 
+    // Convenience: true if the pool-level stop flag is set OR timeman says stop.
+    [[nodiscard]] bool is_stopped() const
+    {
+        return (poolStop_ && poolStop_->load(std::memory_order_relaxed))
+               || (tm_ && tm_->is_stopped());
+    }
+
 private:
+    int                threadIdx_      = 0;          // 0 = main, 1..N = helper
+    std::atomic<bool> *poolStop_       = nullptr;    // points to ThreadPool::stop
+    int                completedDepth_ = 0;          // depth of last fully-completed iteration
+    Move               lastBestMove_   = MOVE_NONE;  // result of last best_move() call
+
     SearchInfo   info_;
     TimeManager *tm_ = nullptr;
 
