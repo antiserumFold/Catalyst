@@ -17,89 +17,179 @@
 #include "thread.h"
 
 #include <algorithm>
-#include <thread>
-#include <vector>
+#include <cassert>
 
 namespace Catalyst {
 
 ThreadPool::ThreadPool(int numThreads)
-    : main_(std::make_unique<Search>())
 {
     set_threads(numThreads);
 }
 
+ThreadPool::~ThreadPool()
+{
+    for (auto &w : workers_)
+    {
+        std::lock_guard<std::mutex> lock(w->mutex);
+        w->exiting   = true;
+        w->searching = true;
+    }
+    for (auto &w : workers_)
+        w->cv.notify_all();
+    for (auto &w : workers_)
+        if (w->thread && w->thread->joinable())
+            w->thread->join();
+}
+
 void ThreadPool::set_threads(int n)
 {
-    helpers_.clear();
-    int numHelpers = std::max(0, n - 1);
-    helpers_.reserve(numHelpers);
-    for (int i = 0; i < numHelpers; ++i)
+    n = std::max(1, n);
+
+    if (!workers_.empty())
     {
-        auto &h              = helpers_.emplace_back();
-        h.searcher           = std::make_unique<Search>();
-        h.board              = std::make_unique<Board>();
-        h.searcher->isSilent = true;
+        wait_for_idle();
+
+        for (auto &w : workers_)
+        {
+            {
+                std::lock_guard<std::mutex> lock(w->mutex);
+                w->exiting   = true;
+                w->searching = true;
+            }
+            w->cv.notify_all();
+        }
+        for (auto &w : workers_)
+            if (w->thread && w->thread->joinable())
+                w->thread->join();
+
+        workers_.clear();
+    }
+
+    workers_.reserve(n);
+    for (int i = 0; i < n; ++i)
+        spawn_worker(i);
+}
+
+void ThreadPool::spawn_worker(int idx)
+{
+    auto &w     = workers_.emplace_back(std::make_unique<Worker>());
+    w->searcher = std::make_unique<Search>(idx, &stop);
+    w->board    = std::make_unique<Board>();
+
+    w->searcher->isSilent = (idx != 0);
+
+    w->thread = std::make_unique<std::thread>([this, idx]() { idle_loop(idx); });
+}
+
+void ThreadPool::idle_loop(int idx)
+{
+    Worker &w = *workers_[idx];
+
+    while (true)
+    {
+        std::unique_lock<std::mutex> lock(w.mutex);
+        w.cv.wait(lock, [&w] { return w.searching; });
+
+        if (w.exiting)
+            return;
+
+        lock.unlock();
+
+        w.searcher->best_move(*w.board, *rootTm_);
+
+        {
+            std::lock_guard<std::mutex> lg(w.mutex);
+            w.searching = false;
+        }
+        w.cv.notify_all();
+
+        if (idx == 0)
+        {
+            std::lock_guard<std::mutex> lg(mainMutex_);
+            mainCv_.notify_all();
+        }
     }
 }
 
-void ThreadPool::stop()
+void ThreadPool::wait_for_idle()
 {
-    main_->stop();
-}
-
-void ThreadPool::clear_all()
-{
-    main_->clear_tables();
-    for (auto &h : helpers_)
-        h.searcher->clear_tables();
-}
-
-uint64_t ThreadPool::total_nodes() const
-{
-    uint64_t total = main_->nodes();
-    for (const auto &h : helpers_)
-        total += h.searcher->nodes();
-    return total;
+    for (auto &w : workers_)
+    {
+        std::unique_lock<std::mutex> lock(w->mutex);
+        w->cv.wait(lock, [&w] { return !w->searching; });
+    }
 }
 
 Move ThreadPool::search(Board &board, TimeManager &tm)
 {
-    main_->stopped.store(false, std::memory_order_relaxed);
-    for (auto &h : helpers_)
-        h.searcher->stopped.store(false, std::memory_order_relaxed);
+    wait_for_idle();
 
-    for (auto &h : helpers_)
-        h.board->copy_from(board);
+    stop.store(false, std::memory_order_seq_cst);
 
-    // shared atomic node counter
-    std::atomic<uint64_t> sharedNodes { 0 };
-    main_->sharedNodes_ = &sharedNodes;
-    for (auto &h : helpers_)
-        h.searcher->sharedNodes_ = &sharedNodes;
+    sharedNodes_.store(0, std::memory_order_relaxed);
 
-    std::vector<std::thread> threads;
-    for (auto &h : helpers_)
+    for (auto &w : workers_)
+        w->board->copy_from(board);
+
+    rootTm_ = &tm;
+    for (auto &w : workers_)
+        w->searcher->sharedNodes_ = &sharedNodes_;
+
+    for (auto &w : workers_)
     {
-        Search *s = h.searcher.get();
-        Board  *b = h.board.get();
-        threads.emplace_back([s, b, &tm]() { s->best_move(*b, tm); });
+        std::lock_guard<std::mutex> lock(w->mutex);
+        w->searching = true;
+    }
+    for (auto &w : workers_)
+        w->cv.notify_all();
+
+    {
+        std::unique_lock<std::mutex> lock(mainMutex_);
+        mainCv_.wait(lock, [this] { return !workers_[0]->searching; });
     }
 
-    Move best = main_->best_move(board, tm);
+    stop.store(true, std::memory_order_seq_cst);
 
-    for (auto &h : helpers_)
-        h.searcher->stopped.store(true, std::memory_order_relaxed);
-    tm.stop();
+    wait_for_idle();
 
-    for (auto &t : threads)
-        t.join();
+    for (auto &w : workers_)
+        w->searcher->sharedNodes_ = nullptr;
 
-    // clear pointers — sharedNodes goes out of scope after this
-    main_->sharedNodes_ = nullptr;
-    for (auto &h : helpers_)
-        h.searcher->sharedNodes_ = nullptr;
+    return best_thread()->best_move_result();
+}
 
+const Search *ThreadPool::best_thread() const
+{
+    const Search *best = workers_[0]->searcher.get();
+    for (size_t i = 1; i < workers_.size(); ++i)
+    {
+        const Search *s = workers_[i]->searcher.get();
+        if (s->completed_depth() > best->completed_depth())
+            best = s;
+    }
     return best;
 }
 
-}  // namespace Catalyst
+void ThreadPool::stop_search()
+{
+    stop.store(true, std::memory_order_seq_cst);
+}
+
+void ThreadPool::clear_all()
+{
+    wait_for_idle();
+    for (auto &w : workers_)
+        w->searcher->clear_tables();
+}
+
+uint64_t ThreadPool::total_nodes() const
+{
+    return sharedNodes_.load(std::memory_order_relaxed);
+}
+
+Move ThreadPool::ponder_move() const
+{
+    return best_thread()->ponder_move();
+}
+
+}
