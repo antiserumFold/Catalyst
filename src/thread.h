@@ -22,7 +22,9 @@
 #include "types.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -30,25 +32,57 @@ namespace Catalyst {
 
 class ThreadPool {
 public:
-    explicit ThreadPool(int numThreads = 1);
-    ~ThreadPool() = default;
+    std::atomic<bool> stop { false };
 
-    void     set_threads(int n);
-    Move     search(Board &board, TimeManager &tm);
-    void     stop();
-    void     clear_all();
+    explicit ThreadPool(int numThreads = 1);
+    ~ThreadPool();
+
+    void set_threads(int n);
+
+    Move search(Board &board, TimeManager &tm);
+
+    void stop_search();
+
+    void wait_for_idle();
+
+    void clear_all();
+
     uint64_t total_nodes() const;
-    Move     ponder_move() const { return main_->ponder_move(); }
-    int      thread_count() const { return int(helpers_.size()) + 1; }
+
+    Move ponder_move() const;
+
+    int thread_count() const { return static_cast<int>(workers_.size()); }
+
+    Search &main_search() { return *workers_[0]->searcher; }
 
 private:
-    std::unique_ptr<Search> main_;
-
-    struct Helper {
+    struct Worker {
         std::unique_ptr<Search> searcher;
         std::unique_ptr<Board>  board;
+
+        std::mutex              mutex;
+        std::condition_variable cv;
+
+        bool searching = false;
+        bool exiting   = false;
+
+        std::unique_ptr<std::thread> thread;
     };
-    std::vector<Helper> helpers_;
+
+    std::vector<std::unique_ptr<Worker>> workers_;
+
+    std::atomic<uint64_t> sharedNodes_ { 0 };
+
+    Board       *rootBoard_ = nullptr;
+    TimeManager *rootTm_    = nullptr;
+
+    std::mutex              mainMutex_;
+    std::condition_variable mainCv_;
+
+    void spawn_worker(int idx);
+    void idle_loop(int idx);
+
+    const Search *best_thread() const;
 };
 
-}  // namespace Catalyst
+}
