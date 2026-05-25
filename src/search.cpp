@@ -300,18 +300,29 @@ bool Search::opponent_has_winning_capture(const Board &board) const
         Bitboard pieces = board.pieces(pt, them);
         while (pieces)
         {
-            Square   from    = pop_lsb(pieces);
-            Bitboard targets = board.pieces(board.side_to_move())
-                               & ~board.pieces(KING, board.side_to_move());
+            Square   from = pop_lsb(pieces);
+            Bitboard targets
+                = board.pieces(board.side_to_move()) & ~board.pieces(KING, board.side_to_move());
             Bitboard atks = 0;
             switch (pt)
             {
-            case PAWN:   atks = pawn_attacks(them, from); break;
-            case KNIGHT: atks = knight_attacks(from); break;
-            case BISHOP: atks = bishop_attacks(from, occ); break;
-            case ROOK:   atks = rook_attacks(from, occ); break;
-            case QUEEN:  atks = bishop_attacks(from, occ) | rook_attacks(from, occ); break;
-            default: break;
+            case PAWN:
+                atks = pawn_attacks(them, from);
+                break;
+            case KNIGHT:
+                atks = knight_attacks(from);
+                break;
+            case BISHOP:
+                atks = bishop_attacks(from, occ);
+                break;
+            case ROOK:
+                atks = rook_attacks(from, occ);
+                break;
+            case QUEEN:
+                atks = bishop_attacks(from, occ) | rook_attacks(from, occ);
+                break;
+            default:
+                break;
             }
             Bitboard caps = atks & targets;
             while (caps)
@@ -566,10 +577,10 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
         if (stateSP_ >= 32767)
             continue;
 
-        const Piece qs_moved    = board.piece_on(from_sq(m));
-        const Piece qs_captured = is_en_passant(m) ? makePiece(~board.side_to_move(), PAWN)
-                                                    : board.piece_on(to_sq(m));
-        const Color qs_stm      = board.side_to_move();
+        const Piece qs_moved = board.piece_on(from_sq(m));
+        const Piece qs_captured
+            = is_en_passant(m) ? makePiece(~board.side_to_move(), PAWN) : board.piece_on(to_sq(m));
+        const Color qs_stm = board.side_to_move();
 
         board.make_move(m, statePool_[stateSP_++]);
         NNUE::push_move(accStack_, board, m, qs_stm, qs_moved, qs_captured);
@@ -1013,10 +1024,10 @@ int Search::negamax(Board &board,
             if (stateSP_ >= 32767)
                 continue;
 
-            const Color pc_stm      = board.side_to_move();
-            const Piece pc_moved    = board.piece_on(from_sq(m));
-            const Piece pc_captured = is_en_passant(m) ? makePiece(~pc_stm, PAWN)
-                                                        : board.piece_on(to_sq(m));
+            const Color pc_stm   = board.side_to_move();
+            const Piece pc_moved = board.piece_on(from_sq(m));
+            const Piece pc_captured
+                = is_en_passant(m) ? makePiece(~pc_stm, PAWN) : board.piece_on(to_sq(m));
             board.make_move(m, statePool_[stateSP_++]);
             NNUE::push_move(accStack_, board, m, pc_stm, pc_moved, pc_captured);
             int pcScore = -quiescence(board, -pcBeta, -pcBeta + 1, ply + 1);
@@ -1252,9 +1263,9 @@ int Search::negamax(Board &board,
             continue;
 
         // Save piece info BEFORE make_move (board state changes after).
-        const Piece moved_piece    = board.piece_on(from_sq(m));
-        const Piece captured_piece = is_en_passant(m) ? makePiece(~us, PAWN)
-                                                       : board.piece_on(to_sq(m));
+        const Piece moved_piece = board.piece_on(from_sq(m));
+        const Piece captured_piece
+            = is_en_passant(m) ? makePiece(~us, PAWN) : board.piece_on(to_sq(m));
 
         board.make_move(m, statePool_[stateSP_++]);
         NNUE::push_move(accStack_, board, m, us, moved_piece, captured_piece);
@@ -1279,16 +1290,22 @@ int Search::negamax(Board &board,
             int R_frac = LMRTable[isQuiet ? 1 : 0][std::min(63, newDepth)][std::min(63, moveCount)]
                          * LMR_FRAC;
 
-            if (cutNode)    R_frac += 2 * LMR_FRAC;  // cut nodes are likely to fail high — reduce more
-            else if (!pvNode) R_frac += LMR_FRAC;     // non-PV nodes less critical
-            if (!improving) R_frac += LMR_FRAC;       // eval trending down — be more aggressive
-            if (givesCheck) R_frac -= LMR_FRAC;       // checks need full attention
-            if (ttPV)       R_frac -= 2 * LMR_FRAC;  // was on PV in a prior search — trust it more
+            if (cutNode)
+                R_frac += 2 * LMR_FRAC;  // cut nodes are likely to fail high — reduce more
+            else if (!pvNode)
+                R_frac += LMR_FRAC;  // non-PV nodes less critical
+            if (!improving)
+                R_frac += LMR_FRAC;  // eval trending down — be more aggressive
+            if (givesCheck)
+                R_frac -= LMR_FRAC;  // checks need full attention
+            if (ttPV)
+                R_frac -= 2 * LMR_FRAC;  // was on PV in a prior search — trust it more
             if (m == killers_[ply][0] || m == killers_[ply][1])
-                            R_frac -= 2 * LMR_FRAC;   // killer moves are historically good at this ply
-            if (m == counter) R_frac -= LMR_FRAC;     // counter move — refuted opponent's last move before
+                R_frac -= 2 * LMR_FRAC;  // killer moves are historically good at this ply
+            if (m == counter)
+                R_frac -= LMR_FRAC;  // counter move — refuted opponent's last move before
             if (cur->complexity > 50)
-                            R_frac -= LMR_FRAC;        // high complexity = correction is doing a lot, be careful
+                R_frac -= LMR_FRAC;  // high complexity = correction is doing a lot, be careful
 
             // History adjusts reduction: good history = less reduction, bad = more.
             if (isQuiet)
@@ -1474,11 +1491,11 @@ int Search::negamax(Board &board,
     {
         TTFlag flag;
         if (bestScore >= beta)
-            flag = TT_LOWER;       // beta cutoff — score is a lower bound
+            flag = TT_LOWER;  // beta cutoff — score is a lower bound
         else if (bestScore > origAlpha)
-            flag = TT_EXACT;       // alpha raised — exact score within window
+            flag = TT_EXACT;  // alpha raised — exact score within window
         else
-            flag = TT_UPPER;       // fail low — score is an upper bound
+            flag = TT_UPPER;  // fail low — score is an upper bound
 
         int storeEval = (rawEval != SCORE_NONE && std::abs(rawEval) < SCORE_INFINITE) ? rawEval : 0;
         ttWriter.save(board.key(),
@@ -1582,7 +1599,7 @@ Move Search::best_move(Board &board, TimeManager &tm)
                     // found something better even if we haven't fully confirmed it.
                     wBeta = std::min(wBeta + delta, SCORE_INFINITE);
                     delta += delta / 2;
-                    if (info_.bestMove != MOVE_NONE)
+                    if (info_.bestMove != MOVE_NONE && board.is_legal(info_.bestMove))
                         bestMove = info_.bestMove;
                     savedPV = pvTable_[0];
                 }
@@ -1593,7 +1610,7 @@ Move Search::best_move(Board &board, TimeManager &tm)
                 }
                 if (delta >= ASP_MAX_DELTA)
                 {
-                    score   = negamax(board, depth, -SCORE_INFINITE, SCORE_INFINITE, 0, true, false);
+                    score = negamax(board, depth, -SCORE_INFINITE, SCORE_INFINITE, 0, true, false);
                     savedPV = pvTable_[0];
                     break;
                 }
@@ -1624,11 +1641,10 @@ Move Search::best_move(Board &board, TimeManager &tm)
                     continue;
             }
 
-            bool     changed    = (info_.bestMove != bestMove);
-            int      delta      = (depth > 1) ? std::abs(score - prevScore) : 0;
-            uint64_t totalNodes = sharedNodes_
-                                      ? sharedNodes_->load(std::memory_order_relaxed)
-                                      : info_.nodes;
+            bool     changed = (info_.bestMove != bestMove);
+            int      delta   = (depth > 1) ? std::abs(score - prevScore) : 0;
+            uint64_t totalNodes
+                = sharedNodes_ ? sharedNodes_->load(std::memory_order_relaxed) : info_.nodes;
             // update_scale() modifies time manager internal state — only the main thread
             // owns time management, helpers must never call this.
             if (threadIdx_ == 0)
