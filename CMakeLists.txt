@@ -22,6 +22,13 @@ endif()
 
 include(CheckIPOSupported)
 
+# ── objcopy ──────────────────────────────────────────────────────────────────
+find_program(OBJCOPY_EXECUTABLE objcopy)
+if(NOT OBJCOPY_EXECUTABLE)
+    message(FATAL_ERROR "objcopy not found. Install binutils (Linux) or use a MinGW toolchain (Windows).")
+endif()
+
+# ── NNUE ─────────────────────────────────────────────────────────────────────
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/network.txt" CATALYST_NET_NAME LIMIT_COUNT 1)
 string(STRIP "${CATALYST_NET_NAME}" CATALYST_NET_NAME)
 
@@ -43,6 +50,7 @@ else()
     message(STATUS "Using NNUE: ${NNUE_FILE}")
 endif()
 
+# ── Git commit hash ───────────────────────────────────────────────────────────
 option(CATALYST_EMBED_COMMIT "Embed git commit hash in version string" ON)
 if(CATALYST_EMBED_COMMIT)
     set(CATALYST_COMMIT_HASH "unknown")
@@ -59,19 +67,22 @@ if(CATALYST_EMBED_COMMIT)
     message(STATUS "Commit hash: ${CATALYST_COMMIT_HASH}")
 endif()
 
+# ── Build targets ─────────────────────────────────────────────────────────────
 option(BUILD_NATIVE      "Build catalyst-native  (-march=native)"        ON)
 option(BUILD_AVX512VNNI  "Build catalyst-avx512vnni"                     OFF)
 option(BUILD_AVX512      "Build catalyst-avx512"                         OFF)
 option(BUILD_BMI2        "Build catalyst-bmi2   (AVX2 + BMI2/PEXT)"     OFF)
 option(BUILD_AVX2        "Build catalyst-avx2"                           OFF)
 option(BUILD_SSE41       "Build catalyst-sse41  (SSE4.1 + POPCNT)"      OFF)
+option(BUILD_X86_64      "Build catalyst-x86-64 (baseline, no SIMD)"    OFF)
 
-option(CATALYST_DATAGEN  "Enable data-generation mode"   OFF)
+option(CATALYST_DATAGEN  "Enable data-generation mode"                   OFF)
 option(CATALYST_PGO_GEN  "Instrument binary for PGO (generate profiles)" OFF)
 option(CATALYST_PGO_USE  "Build optimised binary using PGO profiles"     OFF)
 set(CATALYST_PGO_DIR "${CMAKE_BINARY_DIR}/pgo-profiles"
     CACHE STRING "Directory for PGO profile data")
 
+# ── Sources ───────────────────────────────────────────────────────────────────
 set(CATALYST_SOURCES
     src/main.cpp
     src/uci.cpp
@@ -89,6 +100,7 @@ set(CATALYST_SOURCES
     src/tt.cpp
 )
 
+# ── Helper: add one build target ──────────────────────────────────────────────
 function(catalyst_add_target)
     cmake_parse_arguments(ARG "" "TARGET_NAME" "ARCH_FLAGS;DEFINITIONS" ${ARGN})
 
@@ -107,7 +119,7 @@ function(catalyst_add_target)
     add_custom_command(
         OUTPUT  "${NNUE_OBJ_FILE}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${NNUE_OBJ_DIR}"
-        COMMAND objcopy
+        COMMAND "${OBJCOPY_EXECUTABLE}"
                 --input-target=binary
                 --output-target=${OBJ_FMT}
                 --binary-architecture=i386:x86-64
@@ -203,8 +215,15 @@ function(catalyst_add_target)
         )
     endif()
 
+    # install() rule — matches `make install`
+    include(GNUInstallDirs)
+    install(TARGETS ${ARG_TARGET_NAME}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+
 endfunction()
 
+# ── native ────────────────────────────────────────────────────────────────────
 if(BUILD_NATIVE)
     execute_process(
         COMMAND "${CMAKE_CXX_COMPILER}" -march=native -E -dM -
@@ -216,20 +235,16 @@ if(BUILD_NATIVE)
 
     set(_NATIVE_DEFS "")
 
-    string(FIND "${_NATIVE_DEFINES}" "__BMI2__"        _HAS_BMI2)
-    string(FIND "${_NATIVE_DEFINES}" "__znver1"        _IS_ZEN1)
-    string(FIND "${_NATIVE_DEFINES}" "__znver2"        _IS_ZEN2)
-    string(FIND "${_NATIVE_DEFINES}" "__AVX512BW__"    _HAS_AVX512BW)
-    string(FIND "${_NATIVE_DEFINES}" "__AVX512F__"     _HAS_AVX512F)
-    string(FIND "${_NATIVE_DEFINES}" "__AVX512VNNI__"  _HAS_VNNI)
+    string(FIND "${_NATIVE_DEFINES}" "__BMI2__"       _HAS_BMI2)
+    string(FIND "${_NATIVE_DEFINES}" "__znver1"       _IS_ZEN1)
+    string(FIND "${_NATIVE_DEFINES}" "__znver2"       _IS_ZEN2)
+    string(FIND "${_NATIVE_DEFINES}" "__AVX512BW__"   _HAS_AVX512BW)
+    string(FIND "${_NATIVE_DEFINES}" "__AVX512F__"    _HAS_AVX512F)
+    string(FIND "${_NATIVE_DEFINES}" "__AVX512VNNI__" _HAS_VNNI)
 
     if(NOT _HAS_BMI2 EQUAL -1)
-        set(_ZEN_SLOW TRUE)
-        if(NOT _IS_ZEN1 EQUAL -1 OR NOT _IS_ZEN2 EQUAL -1)
-        else()
-            set(_ZEN_SLOW FALSE)
-        endif()
-        if(NOT _ZEN_SLOW)
+        # Zen1/Zen2 have slow microcode PEXT — disable it
+        if(_IS_ZEN1 EQUAL -1 AND _IS_ZEN2 EQUAL -1)
             list(APPEND _NATIVE_DEFS USE_PEXT)
             message(STATUS "[native] BMI2/PEXT enabled")
         else()
@@ -253,6 +268,7 @@ if(BUILD_NATIVE)
     )
 endif()
 
+# ── explicit arch targets ─────────────────────────────────────────────────────
 if(BUILD_AVX512VNNI)
     catalyst_add_target(
         TARGET_NAME catalyst-avx512vnni
@@ -293,15 +309,29 @@ if(BUILD_SSE41)
     )
 endif()
 
+if(BUILD_X86_64)
+    catalyst_add_target(
+        TARGET_NAME catalyst-x86-64
+        ARCH_FLAGS  -march=x86-64 -mpopcnt -m64
+        DEFINITIONS ""
+    )
+endif()
+
+set(_ENABLED_TARGETS "")
+foreach(_T IN ITEMS native avx512vnni avx512 bmi2 avx2 sse41 x86-64)
+    string(TOUPPER "${_T}" _OPT)
+    string(REPLACE "-" "_" _OPT "${_OPT}")
+    if(BUILD_${_OPT})
+        list(APPEND _ENABLED_TARGETS "catalyst-${_T}")
+    endif()
+endforeach()
+
 message(STATUS "──────────────────────────────────────────")
 message(STATUS "Catalyst ${CATALYST_VERSION_FULL}  (${CMAKE_BUILD_TYPE})")
 message(STATUS "  Compiler : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "  NNUE     : ${CATALYST_NET_NAME}")
 message(STATUS "  Targets  :")
-foreach(_T native avx512vnni avx512 bmi2 avx2 sse41)
-    string(TOUPPER "${_T}" _OPT)
-    if(BUILD_${_OPT} OR (${_T} STREQUAL "native" AND BUILD_NATIVE))
-        message(STATUS "    • catalyst-${_T}")
-    endif()
+foreach(_T IN LISTS _ENABLED_TARGETS)
+    message(STATUS "    • ${_T}")
 endforeach()
 message(STATUS "──────────────────────────────────────────")
