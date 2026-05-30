@@ -473,7 +473,7 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
         }
     }
 
-    if ((is_stopped() || tm_->time_up(info_.nodes)))
+    if ((is_stopped() || (tm_ && tm_->time_up(info_.nodes))))
         return 0;
     if (ply >= MAX_PLY - 1)
         return adjusted_eval(board, ply);
@@ -591,7 +591,7 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
         accStack_.pop();
         --stateSP_;
 
-        if ((is_stopped() || tm_->time_up(info_.nodes)))
+        if ((is_stopped() || (tm_ && tm_->time_up(info_.nodes))))
             return 0;
 
         if (score > bestScore)
@@ -611,7 +611,7 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
     if (bestScore >= beta && !is_mate_score(bestScore) && !is_mate_score(beta))
         bestScore = ilerp(bestScore, beta, QS_FAILHIGH_LERP);
 
-    if (moveCount > 0 && !(is_stopped() || tm_->time_up(info_.nodes))
+    if (moveCount > 0 && !(is_stopped() || (tm_ && tm_->time_up(info_.nodes)))
         && std::abs(bestScore) < SCORE_INFINITE)
     {
         TTFlag flag = (bestScore >= beta) ? TT_LOWER : TT_UPPER;
@@ -669,7 +669,7 @@ int Search::negamax(Board &board,
         }
     }
 
-    if ((is_stopped() || tm_->time_up(info_.nodes)))
+    if ((is_stopped() || (tm_ && tm_->time_up(info_.nodes))))
         return 0;
     if (ply >= MAX_PLY - 1)
         return adjusted_eval(board, ply);
@@ -971,7 +971,7 @@ int Search::negamax(Board &board,
                 accStack_.pop();
                 --stateSP_;
 
-                if ((is_stopped() || tm_->time_up(info_.nodes)))
+                if ((is_stopped() || (tm_ && tm_->time_up(info_.nodes))))
                     return 0;
 
                 if (nullScore >= beta)
@@ -1038,7 +1038,7 @@ int Search::negamax(Board &board,
             accStack_.pop();
             --stateSP_;
 
-            if ((is_stopped() || tm_->time_up(info_.nodes)))
+            if ((is_stopped() || (tm_ && tm_->time_up(info_.nodes))))
                 return 0;
 
             if (pcScore >= pcBeta)
@@ -1367,7 +1367,7 @@ int Search::negamax(Board &board,
         --stateSP_;
         accStack_.pop();
 
-        if ((is_stopped() || tm_->time_up(info_.nodes)))
+        if ((is_stopped() || (tm_ && tm_->time_up(info_.nodes))))
             return 0;
 
         if (score > bestScore)
@@ -1482,11 +1482,11 @@ int Search::negamax(Board &board,
     // Correction history update
     bool bestIsCap = (bestMove != MOVE_NONE) && board.is_capture(bestMove);
     if (excludedMove == MOVE_NONE && staticEval != SCORE_NONE
-        && !(is_stopped() || tm_->time_up(info_.nodes)))
+        && !(is_stopped() || (tm_ && tm_->time_up(info_.nodes))))
         update_correction(board, ply, cur->staticEval, bestScore, depth, bestIsCap);
 
     // TT store — flag depends on whether we raised alpha or got cut.
-    if (!(is_stopped() || tm_->time_up(info_.nodes)) && excludedMove == MOVE_NONE
+    if (!(is_stopped() || (tm_ && tm_->time_up(info_.nodes))) && excludedMove == MOVE_NONE
         && std::abs(bestScore) < SCORE_INFINITE)
     {
         TTFlag flag;
@@ -1580,7 +1580,7 @@ Move Search::best_move(Board &board, TimeManager &tm)
             {
                 score = negamax(board, depth, wAlpha, wBeta, 0, true, false);
 
-                if (score == 0 && (is_stopped() || tm_->time_up(info_.nodes)))
+                if (score == 0 && (is_stopped() || (tm_ && tm_->time_up(info_.nodes))))
                     break;
                 if (is_stopped())
                     break;
@@ -1622,7 +1622,7 @@ Move Search::best_move(Board &board, TimeManager &tm)
             savedPV = pvTable_[0];
         }
 
-        if ((is_stopped() || tm_->time_up(info_.nodes)) && depth > 1)
+        if ((is_stopped() || (tm_ && tm_->time_up(info_.nodes))) && depth > 1)
             break;
         if (is_stopped() && depth > 1)
             break;
