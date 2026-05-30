@@ -172,23 +172,31 @@ cd Catalyst
 
 ```bash
 # Build optimised for the host CPU (recommended)
-make native
+make -j native
 
 # Build a specific architecture
-make linux-avx2
-make linux-bmi2
-make linux-avx512
-make linux-avx512vnni
-make linux-sse41
-make linux-x86-64
+make -j linux-avx2
+make -j linux-bmi2
+make -j linux-avx512
+make -j linux-avx512vnni
+make -j linux-sse41
+make -j linux-x86-64
+
+# Windows targets (requires MinGW cross-compiler)
+make -j win-avx2
+make -j win-bmi2
+make -j win-avx512
+make -j win-avx512vnni
+make -j win-sse41
+make -j win-x86-64
 
 # Release builds
-make release-linux                        # all Linux binaries
-make release-win                          # all Windows binaries (requires MinGW)
+make -j release-linux                     # all Linux binaries
+make -j release-win                       # all Windows binaries
 
 # PGO (profile-guided optimisation)
-make pgo                                  # native CPU
-make pgo ARCH=avx2
+make -j pgo                               # native CPU
+make -j pgo ARCH=avx2
 
 # Debug / sanitizers
 make debug
@@ -208,17 +216,24 @@ make distclean                            # also removes NNUE file
 Requires CMake ≥ 3.16.
 
 ```bash
+# Build for the host CPU (default)
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 
-# Build a specific architecture (native is on by default)
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_NATIVE=ON -DBUILD_AVX2=ON
+# Build specific architectures
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_NATIVE=OFF -DBUILD_AVX2=ON -DBUILD_BMI2=ON
 cmake --build build -j
+
+# Install
+cmake --install build                     # /usr/local/bin
+cmake --install build --prefix /usr
 
 # PGO — two-pass
 cmake -B build-pgo-gen -DCMAKE_BUILD_TYPE=Release -DCATALYST_PGO_GEN=ON
 cmake --build build-pgo-gen -j
 ./build-pgo-gen/catalyst-native bench
+./build-pgo-gen/catalyst-native perft 6
+./build-pgo-gen/catalyst-native go movetime 5000
 
 cmake -B build-pgo -DCMAKE_BUILD_TYPE=Release -DCATALYST_PGO_USE=ON
 cmake --build build-pgo -j
