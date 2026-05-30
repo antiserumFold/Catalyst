@@ -17,11 +17,11 @@
 
 Catalyst uses a `(768 → 256)×2 → 8` neural network with incremental accumulator updates and SIMD-accelerated inference (SSE4.1 / AVX2 / AVX-512), combined with a robust search implementation including PVS, Lazy SMP, and an extensive suite of pruning, extension, and reduction techniques.
 
-[build-badge]:https://img.shields.io/github/actions/workflow/status/AnanyTanwar/Catalyst/catalyst.yml?style=flat-square&logo=github&label=Build
+[build-badge]:https://img.shields.io/github/actions/workflow/status/AnanyTanwar/Catalyst/catalyst.yml?style=for-the-badge&logo=github&label=Build
 [build-link]:https://github.com/AnanyTanwar/Catalyst/actions/workflows/catalyst.yml
-[release-badge]:https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?style=flat-square&logo=github&label=Release&color=3b82f6
+[release-badge]:https://img.shields.io/github/v/release/AnanyTanwar/Catalyst?style=for-the-badge&logo=github&label=Release&color=3b82f6
 [release-link]:https://github.com/AnanyTanwar/Catalyst/releases/latest
-[license-badge]:https://img.shields.io/badge/License-GPL--3.0-2563eb?style=flat-square
+[license-badge]:https://img.shields.io/badge/License-GPL--3.0-2563eb?style=for-the-badge
 [license-link]:https://github.com/AnanyTanwar/Catalyst/blob/main/LICENSE
 
 ## Strength
