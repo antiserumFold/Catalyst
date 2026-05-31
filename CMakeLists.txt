@@ -21,6 +21,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 include(CheckIPOSupported)
+include(GNUInstallDirs)
 
 # ── objcopy ──────────────────────────────────────────────────────────────────
 find_program(OBJCOPY_EXECUTABLE objcopy)
@@ -81,6 +82,11 @@ option(CATALYST_PGO_GEN  "Instrument binary for PGO (generate profiles)" OFF)
 option(CATALYST_PGO_USE  "Build optimised binary using PGO profiles"     OFF)
 set(CATALYST_PGO_DIR "${CMAKE_BINARY_DIR}/pgo-profiles"
     CACHE STRING "Directory for PGO profile data")
+
+if(CATALYST_PGO_GEN AND CATALYST_PGO_USE)
+    message(FATAL_ERROR "CATALYST_PGO_GEN and CATALYST_PGO_USE cannot both be ON — "
+                        "run PGO_GEN first, then PGO_USE in a separate configure.")
+endif()
 
 # ── Sources ───────────────────────────────────────────────────────────────────
 set(CATALYST_SOURCES
@@ -215,8 +221,6 @@ function(catalyst_add_target)
         )
     endif()
 
-    # install() rule — matches `make install`
-    include(GNUInstallDirs)
     install(TARGETS ${ARG_TARGET_NAME}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
@@ -243,7 +247,6 @@ if(BUILD_NATIVE)
     string(FIND "${_NATIVE_DEFINES}" "__AVX512VNNI__" _HAS_VNNI)
 
     if(NOT _HAS_BMI2 EQUAL -1)
-        # Zen1/Zen2 have slow microcode PEXT — disable it
         if(_IS_ZEN1 EQUAL -1 AND _IS_ZEN2 EQUAL -1)
             list(APPEND _NATIVE_DEFS USE_PEXT)
             message(STATUS "[native] BMI2/PEXT enabled")
