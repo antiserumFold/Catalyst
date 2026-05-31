@@ -195,8 +195,8 @@ make -j release-linux                     # all Linux binaries
 make -j release-win                       # all Windows binaries
 
 # PGO (profile-guided optimisation)
-make -j pgo                               # native CPU
-make -j pgo ARCH=avx2
+make pgo                                  # native CPU
+make pgo ARCH=avx2
 
 # Debug / sanitizers
 make debug
