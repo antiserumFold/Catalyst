@@ -487,8 +487,14 @@ namespace Datagen {
                 iss >> cfg.random_plies_max;
             else if (tok == "winadj")
                 iss >> cfg.win_adj_score;
+            else if (tok == "winadjplies")
+                iss >> cfg.win_adj_plies;
             else if (tok == "drawadjscore")
                 iss >> cfg.draw_adj_score;
+            else if (tok == "drawadjplies")
+                iss >> cfg.draw_adj_plies;
+            else if (tok == "drawadjminply")
+                iss >> cfg.draw_adj_min_ply;
             else if (tok == "scoreclamp")
                 iss >> cfg.score_clamp;
             else if (tok == "nodes")
