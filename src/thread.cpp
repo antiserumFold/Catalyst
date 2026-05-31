@@ -33,7 +33,7 @@ ThreadPool::~ThreadPool()
     {
         std::lock_guard<std::mutex> lock(w->mutex);
         w->exiting   = true;
-        w->searching = true; // unblocks the cv.wait in idle_loop
+        w->searching = true;  // unblocks the cv.wait in idle_loop
     }
     for (auto &w : workers_)
         w->cv.notify_all();
@@ -165,14 +165,29 @@ Move ThreadPool::search(Board &board, TimeManager &tm)
     return best_thread()->best_move_result();
 }
 
-// Return the searcher that reached the greatest depth — its move is most trustworthy.
+/// Return the searcher whose result is most trustworthy.
+// Prefer mate finders first, then deepest search that isn't significantly worse in score.
 const Search *ThreadPool::best_thread() const
 {
     const Search *best = workers_[0]->searcher.get();
     for (size_t i = 1; i < workers_.size(); ++i)
     {
-        const Search *s = workers_[i]->searcher.get();
-        if (s->completed_depth() > best->completed_depth())
+        const Search *s      = workers_[i]->searcher.get();
+        int           sBest  = s->last_score();
+        int           bBest  = best->last_score();
+        int           sDepth = s->completed_depth();
+        int           bDepth = best->completed_depth();
+
+        bool sMate = std::abs(sBest) >= SCORE_MATE_IN_MAX_PLY;
+        bool bMate = std::abs(bBest) >= SCORE_MATE_IN_MAX_PLY;
+
+        if (sMate != bMate)
+        {
+            if (sMate)
+                best = s;
+            continue;
+        }
+        if (sDepth > bDepth && sBest >= bBest - 50)
             best = s;
     }
     return best;
