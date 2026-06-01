@@ -1,5 +1,5 @@
 // Catalyst is a UCI compliant chess engine
-// Copyright (C) 2026 Anany Tanwar
+//  Copyright (C) 2026 Anany Tanwar
 
 // Catalyst is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -29,7 +29,6 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
-#include <tuple>
 
 namespace Catalyst {
 
@@ -814,6 +813,10 @@ int Search::negamax(Board &board,
                         gravity((*(cur - 1)->contHistEntry)[ttPt][to_sq(ttMove)],
                             -malus,
                             HISTORY_MAX);
+                    if ((cur - 2)->contHistEntry)
+                        gravity((*(cur - 2)->contHistEntry)[ttPt][to_sq(ttMove)],
+                            -malus,
+                            HISTORY_MAX);
                 }
                 return ttScore;
             }
@@ -1034,7 +1037,7 @@ int Search::negamax(Board &board,
             int pcScore = -quiescence(board, -pcBeta, -pcBeta + 1, ply + 1);
             if (pcScore >= pcBeta && depth >= 4)
                 pcScore
-                    = -negamax(board, depth - 4, -pcBeta, -pcBeta + 1, ply + 1, false, !cutNode);
+                    = -negamax(board, depth - 3, -pcBeta, -pcBeta + 1, ply + 1, false, !cutNode);
             board.unmake_move(m);
             accStack_.pop();
             --stateSP_;
@@ -1318,7 +1321,7 @@ int Search::negamax(Board &board,
 
             // Each alpha raise tightens the window, making further reductions riskier.
             if (alphaRaises > 0)
-                R_frac += alphaRaises * LMR_FRAC / 2;
+                R_frac += std::min(alphaRaises, 2) * LMR_FRAC / 2;
 
             // If children cut off quickly, this subtree is noisy — reduce siblings more.
             int nextCutoffs = (ply + 1 < MAX_PLY) ? ss(ply + 1)->cutoffCnt : 0;
@@ -1393,7 +1396,7 @@ int Search::negamax(Board &board,
                 update_counter(us, prevMove, m);
             // Slightly reduce depth after an alpha raise — we now have a tighter bound,
             // so earlier moves at this depth are less likely to matter.
-            if (depth >= ALPHA_RAISE_DEPTH_MIN && depth <= ALPHA_RAISE_DEPTH_MAX
+            if (alphaRaises == 1 && depth >= ALPHA_RAISE_DEPTH_MIN && depth <= ALPHA_RAISE_DEPTH_MAX
                 && !is_mate_score(beta) && !is_mate_score(alpha))
                 --depth;
         }
