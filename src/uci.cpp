@@ -401,7 +401,7 @@ void UCI::cmd_bench(std::istringstream &iss)
     }
 
     auto result = Benchmark::run(benchDepth, threads);
-    Benchmark::print_results(result, true);
+    Benchmark::print_results(result);
     board.set_startpos();
 }
 
