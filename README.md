@@ -1,6 +1,6 @@
 # Catalyst
 
-Catalyst is a strong UCI chess engine written in C++20. It combines a neural network trained entirely on self-generated games with a deeply optimized search, featuring PVS with iterative deepening, Lazy SMP multi-threaded search, and a wide range of pruning, reduction, and extension techniques. The network is embedded directly into the binary, updated incrementally during search, and accelerated with SIMD instructions for fast inference. Catalyst is an active project with ongoing development across search, evaluation, and training infrastructure.
+Catalyst is a strong UCI chess engine written in C++20. It combines a neural network trained entirely on self-generated games with a deeply optimized search, featuring PVS with iterative deepening, Lazy SMP multi-threaded search, and a wide range of pruning, reduction, and extension techniques. The network is embedded directly into the binary, updated incrementally during search, and accelerated with SIMD instructions for fast inference.
 
 ## Strength
 
