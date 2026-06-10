@@ -909,7 +909,8 @@ int Search::negamax(Board &board,
 
         // Reverse futility pruning: static eval is so far above beta that we're
         // almost certainly going to beat it — skip the search.
-        if (depth < RFP_MAX_DEPTH && !is_mate_score(staticEval))
+        if (depth < RFP_MAX_DEPTH && !is_mate_score(staticEval) && !cur->ttPv
+            && (ttMove == MOVE_NONE || board.is_capture_or_promotion(ttMove)))
         {
             int margin = RFP_MARGIN_MULT * depth - (improving ? 80 : 0)
                          - (opponentWorsening ? 20 : 0) - prevHistScore / RFP_HIST_DIV;
