@@ -132,6 +132,7 @@ void UCI::loop()
             join_search();
             cmd_eval();
         }
+// texel tune is gone but let it stay here I use NNUE
 #ifdef TUNING
         else if (token == "tune")
         {
