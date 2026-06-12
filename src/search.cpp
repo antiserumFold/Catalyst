@@ -922,9 +922,9 @@ int Search::negamax(Board &board,
         // If they STILL can't beat beta, our position is overwhelming.
         // Guards: requires major/minor pieces (avoid zugzwang), depth >= 3,
         //         and eval well above beta.
-        if (!pvNode && depth >= 3 && staticEval >= beta
+        if (cutNode && depth >= 3 && staticEval >= beta
             && staticEval >= beta + NMP_BETA_BASE - NMP_BETA_MULT * depth
-            && (cur - 1)->move != MOVE_NONE && ply >= nmpMinPly_
+            && (ply == 0 || (cur - 1)->move != MOVE_NONE) && ply >= nmpMinPly_
             && (board.pieces(KNIGHT, board.side_to_move())
                 | board.pieces(BISHOP, board.side_to_move())
                 | board.pieces(ROOK, board.side_to_move())
