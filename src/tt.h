@@ -72,7 +72,6 @@ struct alignas(64) TTCluster {
 static_assert(sizeof(TTCluster) == 64, "TTCluster must be 64 bytes");
 
 // Snapshot returned by probe() — safe to read after store().
-// Garbage tt 
 struct TTData {
     Move   move;
     int    score;
