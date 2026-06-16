@@ -583,7 +583,6 @@ int Search::quiescence(Board &board, int alpha, int beta, int ply)
             flag,
             MOVE_NONE,
             storeEval,
-            board.rule50_count(),
             false,
             tt.generation());
     }
@@ -783,15 +782,7 @@ int Search::negamax(Board &board,
 
         // Pre-populate TT with just the eval so future searches can skip calling NNUE.
         if (!ttHit && excludedMove == MOVE_NONE && depth >= 4)
-            ttWriter.save(board.key(),
-                0,
-                0,
-                TT_NONE,
-                MOVE_NONE,
-                rawEval,
-                board.rule50_count(),
-                false,
-                tt.generation());
+            ttWriter.save(board.key(), 0, 0, TT_NONE, MOVE_NONE, rawEval, false, tt.generation());
 
         // Clamp static eval toward the TT score if TT provides a tighter bound.
         if (ttHit && ttFlag != TT_NONE)
@@ -999,7 +990,6 @@ int Search::negamax(Board &board,
                     TT_LOWER,
                     m,
                     rawEval != SCORE_NONE ? rawEval : 0,
-                    board.rule50_count(),
                     false,
                     tt.generation());
                 return pcScore;
@@ -1189,7 +1179,6 @@ int Search::negamax(Board &board,
                     TT_LOWER,
                     m,
                     rawEval != SCORE_NONE ? rawEval : 0,
-                    board.rule50_count(),
                     false,
                     tt.generation());
                 return mcScore;
@@ -1449,7 +1438,6 @@ int Search::negamax(Board &board,
             flag,
             bestMove,
             storeEval,
-            board.rule50_count(),
             isPV,
             tt.generation());
     }
